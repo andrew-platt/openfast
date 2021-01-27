@@ -104,28 +104,30 @@ def _save_plot(script, div, path, attribute):
         div = div.replace("<div", " ".join(("<div", style)))
         f.write(div)
 
-def plotOpenfastError(testSolution, baselineSolution, attribute):
-    testSolution, baselineSolution, attribute = _validateAndExpandInputs([
-        testSolution, baselineSolution, attribute
-    ])
-    dict1, info1 = _parseSolution(testSolution)
-    dict2, info2 = _parseSolution(baselineSolution)
+def plotOpenfastError(case_path, testSolution, baselineSolution, attribute, index):
+    # testSolution, baselineSolution, attribute = _validateAndExpandInputs([
+    #     testSolution, baselineSolution, attribute
+    # ])
+    # dict1, info1 = _parseSolution(testSolution)
+    # dict2, info2 = _parseSolution(baselineSolution)
+    dict1 = testSolution
+    dict2 = baselineSolution
 
-    try:
-        channel = info1['attribute_names'].index(attribute)
-    except Exception as e:
-        rtl.exitWithError("Error: Invalid channel name--{}".format(e))
+    # try:
+    #     channel = info1['attribute_names'].index(attribute)
+    # except Exception as e:
+    #     rtl.exitWithError("Error: Invalid channel name--{}".format(e))
 
-    title1 = attribute + " (" + info1["attribute_units"][channel] + ")"
+    title1 = attribute # + " (" + info1["attribute_units"][channel] + ")"
     title2 = "Max norm"
     xlabel = 'Time (s)'
 
     timevec = dict1[:, 0]
-    y1series = np.array(dict1[:, channel], dtype = np.float)
-    y2series = np.array(dict2[:, channel], dtype = np.float)
+    y1series = np.array(dict1[:, index], dtype = np.float)
+    y2series = np.array(dict2[:, index], dtype = np.float)
     script, div = _plotError(timevec, y1series, y2series, xlabel, title1, title2)
 
-    basePath = os.path.sep.join(testSolution.split(os.path.sep)[:-1])
+    basePath = case_path  # os.path.sep.join(testSolution.split(os.path.sep)[:-1])
     plotPath = os.path.join(basePath, "plots")
     rtl.validateDirOrMkdir(plotPath)
     _save_plot(script, div, plotPath, attribute)

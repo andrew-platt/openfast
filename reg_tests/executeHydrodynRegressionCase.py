@@ -30,6 +30,7 @@ import argparse
 import shutil
 import glob
 import subprocess
+import numpy as np
 import rtestlib as rtl
 import openfastDrivers
 import pass_fail
@@ -113,11 +114,36 @@ rtl.validateFileOrExit(baselineOutFile)
 
 testData, testInfo, testPack = pass_fail.readFASTOut(localOutFile)
 baselineData, baselineInfo, _ = pass_fail.readFASTOut(baselineOutFile)
-performance = pass_fail.calculateNorms(testData, baselineData)
+
+### Extract the channels common to both testData and baselineData
+
+# Find the channel names common to both
+common_channels = set(testInfo["attribute_names"]) & set(baselineInfo["attribute_names"])
+
+# Get the index of these channels in the data sets
+test_channel_indexes = [testInfo["attribute_names"].index(channel) for channel in common_channels]
+baseline_channel_indexes = [baselineInfo["attribute_names"].index(channel) for channel in common_channels]
+
+# Sort the channel list and indexes to make the plots easier to grock
+common_channels = [ c for _, c in sorted( zip( test_channel_indexes, common_channels ), key=lambda pair: pair[0])]
+test_channel_indexes = sorted(test_channel_indexes)
+baseline_channel_indexes = sorted(baseline_channel_indexes)
+
+# Extract the common channels into new data sets
+common_test_data = np.empty( ( len(testData), len(common_channels) ) )
+common_baseline_data = np.empty( ( len(baselineData), len(common_channels) ) )
+
+for i,index in enumerate(test_channel_indexes):
+    common_test_data[:,i] = testData[:,index]
+
+for i,index in enumerate(baseline_channel_indexes):
+    common_baseline_data[:,i] = baselineData[:,index]
+
+performance = pass_fail.calculateNorms(common_test_data, common_baseline_data)
 normalizedNorm = performance[:, 1]
 
 # export all case summaries
-results = list(zip(testInfo["attribute_names"], [*performance]))
+results = list(zip(common_channels, [*performance]))
 results_max = performance.max(axis=0)
 exportCaseSummary(testBuildDirectory, caseName, results, results_max, tolerance)
 
@@ -125,15 +151,11 @@ exportCaseSummary(testBuildDirectory, caseName, results, results_max, tolerance)
 if not pass_fail.passRegressionTest(normalizedNorm, tolerance):
     if plotError:
         from errorPlotting import finalizePlotDirectory, plotOpenfastError
-        ixFailChannels = [i for i in range(len(testInfo["attribute_names"])) if normalizedNorm[i] > tolerance]
-        failChannels = [channel for i, channel in enumerate(testInfo["attribute_names"]) if i in ixFailChannels]
+        ixFailChannels = [i for i in range(len(common_channels)) if normalizedNorm[i] > tolerance]
+        failChannels = [channel for i, channel in enumerate(common_channels) if i in ixFailChannels]
         failResults = [res for i, res in enumerate(results) if i in ixFailChannels]
         for channel in failChannels:
-            try:
-                plotOpenfastError(localOutFile, baselineOutFile, channel)
-            except:
-                error = sys.exc_info()[1]
-                print("Error generating plots: {}".format(error.msg))
+            plotOpenfastError(testBuildDirectory, common_test_data, common_baseline_data, channel, common_channels.index(channel))
         finalizePlotDirectory(localOutFile, failChannels, caseName)
     sys.exit(1)
     
