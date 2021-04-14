@@ -134,7 +134,7 @@ subroutine FAST_Sizes(iTurb, TMax, InitInpAry, InputFileName_c, AbortErrLev_c, N
    CALL FAST_InitializeAll_T( t_initial, 1_IntKi, Turbine(iTurb), ErrStat, ErrMsg, InputFileName, ExternInitData )
                   
    AbortErrLev_c = AbortErrLev   
-   NumOuts_c     = min(MAXOUTPUTS, 1 + SUM( Turbine(iTurb)%y_FAST%numOuts )) ! includes time
+   NumOuts_c     = min(MAXOUTPUTS, SUM( Turbine(iTurb)%y_FAST%numOuts ))
    dt_c          = Turbine(iTurb)%p_FAST%dt
 
    ErrStat_c     = ErrStat
@@ -214,7 +214,7 @@ subroutine FAST_Start(iTurb, NumInputs_c, NumOutputs_c, InputAry, OutputAry, Err
          OutputAry(1)              = Turbine(iTurb)%m_FAST%t_global 
          OutputAry(2:NumOutputs_c) = Outputs 
 
-         CALL FAST_Linearize_T(t_initial, 0, Turbine(iTurb), ErrStat, ErrMsg)
+         CALL FAST_Linearize_T(t_initial, 0, Turbine(iTurb), ErrStat2, ErrMsg2)
          if (ErrStat2 /= ErrID_None) then
             ErrStat = max(ErrStat,ErrStat2)
             ErrMsg = TRIM(ErrMsg)//NewLine//TRIM(ErrMsg2)
@@ -526,8 +526,8 @@ subroutine FAST_OpFM_Init(iTurb, TMax, InputFileName_c, TurbID, NumSC2Ctrl, NumC
       NumBl_c     = SIZE(Turbine(iTurb)%AD14%Input(1)%InputMarkers)
       NumBlElem_c = Turbine(iTurb)%AD14%Input(1)%InputMarkers(1)%Nnodes
    ELSEIF (Turbine(iTurb)%p_FAST%CompAero == MODULE_AD) THEN  
-      NumBl_c     = SIZE(Turbine(iTurb)%AD%Input(1)%BladeMotion)
-      NumBlElem_c = Turbine(iTurb)%AD%Input(1)%BladeMotion(1)%Nnodes
+      NumBl_c     = SIZE(Turbine(iTurb)%AD%Input(1)%rotors(1)%BladeMotion)
+      NumBlElem_c = Turbine(iTurb)%AD%Input(1)%rotors(1)%BladeMotion(1)%Nnodes
    ELSE
       NumBl_c     = 0
       NumBlElem_c = 0
@@ -610,8 +610,8 @@ subroutine FAST_OpFM_Restart(iTurb, CheckpointRootName_c, AbortErrLev_c, dt_c, n
    n_t_global_c  = n_t_global
    AbortErrLev_c = AbortErrLev   
    NumOuts_c     = min(MAXOUTPUTS, 1 + SUM( Turbine(iTurb)%y_FAST%numOuts )) ! includes time
-   numBlades_c   = Turbine(iTurb)%ad%p%numblades
-   numElementsPerBlade_c = Turbine(iTurb)%ad%p%numblnds ! I'm not sure if FASTv8 can handle different number of blade nodes for each blade.
+   numBlades_c   = Turbine(iTurb)%ad%p%rotors(1)%numblades
+   numElementsPerBlade_c = Turbine(iTurb)%ad%p%rotors(1)%numblnds ! I'm not sure if FASTv8 can handle different number of blade nodes for each blade.
    dt_c          = Turbine(iTurb)%p_FAST%dt      
       
    ErrStat_c     = ErrStat
