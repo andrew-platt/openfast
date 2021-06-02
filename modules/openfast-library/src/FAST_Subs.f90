@@ -707,8 +707,20 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          Init%InData_LidSim%RootName  =   TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_LidSim))
          Init%InData_LidSim%InputInitFile =   p_FAST%LidarFile
          Init%InData_LidSim%DT            =   p_FAST%DT
-         Init%InData_LidSim%LidarRefPosition(1:3)        = ED%Input(1)%NacelleLoads%Position(1:3,1)
-         Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%Input(1)%NacelleLoads%RefOrientation(1:3,1:3,1)  ! R8Ki
+         ! Reference location to pass in
+         if (    p_FAST%LidarMountLocation == LidarMount_Nacelle ) then
+            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%Input(1)%NacelleLoads%Position(1:3,1)
+            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%Input(1)%NacelleLoads%RefOrientation(1:3,1:3,1)  ! R8Ki
+         elseif( p_FAST%LidarMountLocation == LidarMount_Hub ) then          ! hub mesh from ED
+            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%HubPtMotion%Position(:,1)
+            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%HubPtMotion%RefOrientation(:,:,1)
+         elseif( p_FAST%LidarMountLocation == LidarMount_Ground ) then       ! use tower base reference
+            Init%InData_LidSim%LidarRefPosition(1:3)        = Init%OutData_ED%TwrBasePos
+            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = Init%OutData_ED%TwrBaseOrient                      ! R8Ki
+         elseif( p_FAST%LidarMountLocation == LidarMount_Platform ) then     ! for floating, the platform ref point is used for ExtPtfm, SD, and ED (monopile)
+            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%PlatformPtMesh%Position(1:3,1)
+            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%PlatformPtMesh%Orientation(1:3,1:3,1)  ! R8Ki
+         endif
          CALL LidarSim_Init( Init%InData_LidSim, LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), &
                     LidSim%OtherSt(STATE_CURR), LidSim%y, LidSim%m, p_FAST%dt_module( MODULE_LidSim ), Init%OutData_LidSim, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
@@ -1769,8 +1781,6 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
 
    IF (p%CompLidar == Module_LidSim) then
       if (p%LidarMountLocation == LidarMount_Platform .and. p%CompHydro /= Module_HD) CALL SetErrStat( ErrID_Fatal, 'Lidar cannot be mounted on the platform without HydroDyn.', ErrStat, ErrMsg, RoutineName )
-!Temporary warning until mesh mapping completed:
-      if (p%LidarMountLocation /= LidarMount_Nacelle) CALL SetErrStat( ErrID_Fatal, 'Lidar (CompLidar) mounting to hub (2), ground (3), or Platform (4) not supported yet. Only nacelle mounting (CompLidar == 1) is supported at this time.', ErrStat, ErrMsg, RoutineName )
    END IF
 
 !   IF ( p%InterpOrder < 0 .OR. p%InterpOrder > 2 ) THEN
@@ -4619,7 +4629,7 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
       CALL FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, &
-                               MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep )
+                               MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          IF (ErrStat >= AbortErrLev) RETURN
 
@@ -5405,6 +5415,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD, IfW, OpFM, H
    if (allocated(LidSim%Input)) then
       IF ( LidSim%Input(1)%LidarMesh%Committed ) THEN
          call MeshWrVTK(p_FAST%TurbinePos, LidSim%Input(1)%LidarMesh, trim(p_FAST%VTK_OutFileRoot)//'.LidSim', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
+!FIXME: add the line of site mesh output here.
       END IF
    end if
 

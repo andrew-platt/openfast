@@ -406,6 +406,7 @@ END SUBROUTINE ED_InputSolve
 !FIXME: add LidarSim points
 SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, OtherSt_AD, y_ED, ErrStat, ErrMsg )
 
+!FIXME: add LidarSim wind points here:
    TYPE(InflowWind_InputType),     INTENT(INOUT)   :: u_IfW       !< The inputs to InflowWind
    TYPE(InflowWind_ParameterType), INTENT(IN   )   :: p_IfW       !< The parameters to InflowWind   
    TYPE(AD14_InputType),           INTENT(IN)      :: u_AD14      !< The input meshes (already calculated) from AeroDyn14
@@ -929,17 +930,19 @@ END SUBROUTINE AD14_InputSolve_NoIfW
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for ServoDyn
-SUBROUTINE SrvD_InputSolve( p_FAST, m_FAST, u_SrvD, y_ED, y_IfW, y_OpFM, y_BD, y_SD, MeshMapData, ErrStat, ErrMsg )
+SUBROUTINE SrvD_InputSolve( p_FAST, m_FAST, p_SrvD, u_SrvD, y_ED, y_IfW, y_OpFM, y_BD, y_SD, y_LidSim, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    TYPE(FAST_ParameterType),         INTENT(IN)     :: p_FAST       !< Glue-code simulation parameters
    TYPE(FAST_MiscVarType),           INTENT(IN)     :: m_FAST       !< Glue-code misc variables (including inputs from external sources like Simulink)
+   TYPE(SrvD_ParameterType),         INTENT(IN)     :: p_SrvD       !< ServoDyn parameters
    TYPE(SrvD_InputType),             INTENT(INOUT)  :: u_SrvD       !< ServoDyn Inputs at t
    TYPE(ED_OutputType),TARGET,       INTENT(IN)     :: y_ED         !< ElastoDyn outputs
    TYPE(InflowWind_OutputType),      INTENT(IN)     :: y_IfW        !< InflowWind outputs
    TYPE(OpFM_OutputType),            INTENT(IN)     :: y_OpFM       !< OpenFOAM outputs
    TYPE(BD_OutputType),              INTENT(IN)     :: y_BD(:)      !< BD Outputs
    TYPE(SD_OutputType),              INTENT(IN)     :: y_SD         !< SD Outputs
+   TYPE(LidarSim_OutputType),        INTENT(IN)     :: y_LidSim     !< LidarSim Outputs
    TYPE(FAST_ModuleMapType),         INTENT(INOUT)  :: MeshMapData  !< Data for mapping between modules
    INTEGER(IntKi),                   INTENT(  OUT)  :: ErrStat      !< Error status
    CHARACTER(*),                     INTENT(  OUT)  :: ErrMsg       !< Error message
@@ -979,9 +982,6 @@ SUBROUTINE SrvD_InputSolve( p_FAST, m_FAST, u_SrvD, y_ED, y_IfW, y_OpFM, y_BD, y
    ENDIF
 
    
-
-
-
       
       ! ServoDyn inputs from combination of InflowWind and ElastoDyn
 
@@ -1100,8 +1100,37 @@ SUBROUTINE SrvD_InputSolve( p_FAST, m_FAST, u_SrvD, y_ED, y_IfW, y_OpFM, y_BD, y
       ! we're going to use the extrapolated values instead of the old values (Simulink inputs are from t, not t+dt)
    CALL SrvD_SetExternalInputs( p_FAST, m_FAST, u_SrvD )
 #endif
-      
-                        
+
+
+   ! Lidar
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      ! Additional signals for avrSWAP array
+      u_SrVD%LidarMeas%NewData    = NINT(y_LidSim%SwapOutputs(1))    !FIXME: integers are not permitted in inputs.  Extrap-Interp cannot handle them.
+      u_SrVD%LidarMeas%BeamID     = NINT(y_LidSim%SwapOutputs(2))    !FIXME: integers are not permitted in inputs.  Extrap-Interp cannot handle them.
+!FIXME: we should not need to access p_SrvD here!!!!
+      u_SrVD%LidarMeas%LdrRoll    = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 1 )
+      u_SrVD%LidarMeas%LdrPitch   = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 2 )
+      u_SrVD%LidarMeas%LdrYaw     = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 3 )
+      u_SrVD%LidarMeas%LdrXd      = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 4 )
+      u_SrVD%LidarMeas%LdrYd      = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 5 )
+      u_SrVD%LidarMeas%LdrZd      = y_LidSim%SwapOutputs( 2 + p_SrvD%GatesPerBeam + 6 )
+      if (allocated(u_SrVD%LidarMeas%Vlos)) then   ! Shouldn't be necessary here, but just in case
+         u_SrVD%LidarMeas%Vlos( 1:p_SrvD%GatesPerBeam ) = y_LidSim%SwapOutputs( 3:(2 + p_SrvD%GatesPerBeam) )
+      endif
+   ELSE
+      u_SrVD%LidarMeas%NewData    = 0
+      u_SrVD%LidarMeas%BeamID     = 0
+      u_SrVD%LidarMeas%LdrRoll    = 0
+      u_SrVD%LidarMeas%LdrPitch   = 0
+      u_SrVD%LidarMeas%LdrYaw     = 0
+      u_SrVD%LidarMeas%LdrXd      = 0
+      u_SrVD%LidarMeas%LdrYd      = 0
+      u_SrVD%LidarMeas%LdrZd      = 0
+      if (allocated(u_SrVD%LidarMeas%Vlos)) then
+         u_SrVD%LidarMeas%Vlos       = 0
+      endif
+   END IF
+
 END SUBROUTINE SrvD_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs for the SrvD%SStC mesh motion from ElastoDyn
@@ -1444,6 +1473,55 @@ SUBROUTINE IceD_InputSolve( u_IceD, y_SD, MeshMapData, legNum, ErrStat, ErrMsg )
    CALL Transfer_Point_to_Point( y_SD%y2Mesh, u_IceD%PointMesh, MeshMapData%SD_P_2_IceD_P(legNum), ErrStat, ErrMsg )
 
 END SUBROUTINE IceD_InputSolve
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine sets the inputs for LidarSim
+SUBROUTINE LidarSim_InputSolve( p_FAST, u_LidSim, y_IfW, y_ED, y_SD, y_SrvD, MeshMapData, ErrStat, ErrMsg )
+!..................................................................................................................................
+
+      ! Passed variables
+   TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_fast                   !< Glue-code simulation parameters
+   TYPE(LidarSim_InputType),       INTENT(INOUT)  :: u_LidSim                 !< LidarSim Inputs at t
+   TYPE(InflowWind_OutputType),    INTENT(IN   )  :: y_IfW                    !< InflowWind outputs
+   TYPE(ED_OutputType),            INTENT(IN   )  :: y_ED                     !< InflowWind outputs
+   TYPE(SD_OutputType),            INTENT(IN   )  :: y_SD                     !< SubDyn outputs
+   TYPE(SrvD_OutputType),          INTENT(IN   )  :: y_SrvD                   !< ServoDyn outputs
+
+   TYPE(FAST_ModuleMapType),       INTENT(INOUT)  :: MeshMapData              !< Data for mapping between modules
+   INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat                  !< Error status
+   CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg                   !< Error message
+
+      ! local variables
+   INTEGER(IntKi)                             :: ErrStat2                     ! temporary Error status of the operation
+   CHARACTER(ErrMsgLen)                       :: ErrMsg2                      ! temporary Error message if ErrStat /= ErrID_None
+   CHARACTER(*), PARAMETER                    :: RoutineName = 'LidarSim_InputSolve'
+
+   ErrStat = ErrID_None
+   ErrMsg = ""
+
+   ! Transfer motions for Nacelle, Hub, Ground, or Platform.  Ground requires no mapping since is fixed to global
+   IF ( u_LidSim%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Nacelle ) THEN      ! ED nacelle to LD
+      CALL Transfer_Point_to_Point( y_ED%NacelleMotion, u_LidSim%LidarMesh, MeshMapData%ED_P_2_LS_P_N, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':y_ED%NacelleMotion' )
+   ELSEIF ( u_LidSim%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Hub ) THEN      ! ED hub to LD
+      CALL Transfer_Point_to_Point( y_ED%HubPtMotion, u_LidSim%LidarMesh, MeshMapData%ED_P_2_LS_P_H, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':y_ED%HubPtMotion' )
+   !ELSEIF ( u_LidSim%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Ground ) THEN   ! keep global coords
+   !   ! Nothing to do here --coordinate is global fixed.  Keeping above comment line for consistency
+   ELSEIF ( u_LidSim%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Platform ) THEN ! platform
+      IF ( p_FAST%CompSub /= Module_SD ) THEN   ! rigid floater, land based, or ExtPtfm
+         CALL Transfer_Point_to_Point( y_ED%PlatformPtMesh, u_LidSim%LidarMesh, MeshMapData%ED_P_2_LS_P_P, ErrStat2, ErrMsg2 )
+            CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':y_ED%PlatformPtMesh' )
+      ELSE                                      ! SubDyn (fixed bottom or flexible floater)
+         CALL Transfer_Point_to_Point( y_SD%y2Mesh, u_LidSim%LidarMesh, MeshMapData%SD_P_2_LS_P_P, ErrStat2, ErrMsg2 )
+            CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':SD%y%y2Mesh' )
+      ENDIF
+   END IF
+
+!FIXME: transfer IfW points here
+
+!FIXME: send controls from SrvD here
+
+END SUBROUTINE LidarSim_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine sets the inputs required for IceFloe.
 SUBROUTINE Transfer_ED_to_BD( y_ED, u_BD, MeshMapData, ErrStat, ErrMsg )
@@ -4839,12 +4917,25 @@ SUBROUTINE InitModuleMappings(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, M
    IF (ErrStat >= AbortErrLev ) RETURN   
       
 !-------------------------
-!  ElastoDyn <-> LidarSim
+!  ED / SD --> LidarSim
 !-------------------------
-   ! If we choose a hub mounted lidar, add that mesh option here
-   IF ( LidSim%Input(1)%LidarMesh%Committed ) THEN ! ED-LD
-      CALL MeshMapCreate( ED%y%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_2_LD_LidarMotion' )
+   ! Set mesh mapping for Nacelle, Hub, Ground, or Platform.  Ground requires no mapping since is fixed to global
+   IF ( LidSim%Input(1)%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Nacelle ) THEN      ! ED nacelle to LD
+      CALL MeshMapCreate( ED%y%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LS_P_N, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_P_2_LS_P_N' )
+   ELSEIF ( LidSim%Input(1)%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Hub ) THEN      ! ED hub to LD
+      CALL MeshMapCreate( ED%y%HubPtMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LS_P_H, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_P_2_LS_P_H' )
+   !ELSEIF ( LidSim%Input(1)%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Ground ) THEN   ! keep global coords
+   !   ! Nothing to do here --coordinate is global fixed.  Keeping above comment line for consistency
+   ELSEIF ( LidSim%Input(1)%LidarMesh%Committed .and. p_FAST%LidarMountLocation == LidarMount_Platform ) THEN ! platform
+      IF ( p_FAST%CompSub /= Module_SD ) THEN   ! rigid floater, land based, or ExtPtfm
+         CALL MeshMapCreate( PlatformMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LS_P_P, ErrStat2, ErrMsg2 )
+            CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':ED_P_2_LS_P_P' )
+      ELSE                                      ! SubDyn (fixed bottom or flexible floater)
+         CALL MeshMapCreate( SD%y%y2Mesh, LidSim%Input(1)%LidarMesh, MeshMapData%SD_P_2_LS_P_P, ErrStat2, ErrMsg2 )
+            CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//':SD_P_2_LS_P_P' )
+      ENDIF
    END IF
    IF (ErrStat >= AbortErrLev ) RETURN
 
@@ -5139,8 +5230,9 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
    END IF
    
    
-   IF ( p_FAST%CompServo == Module_SrvD  ) THEN         
-      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%y, IfW%y, OpFM%y, BD%y, SD%y, MeshmapData, ErrStat2, ErrMsg2 )
+   IF ( p_FAST%CompServo == Module_SrvD  ) THEN
+!FIXME: do not pass SrvD%p
+      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%p, SrvD%Input(1), ED%y, IfW%y, OpFM%y, BD%y, SD%y, LidSim%y, MeshmapData, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
    END IF         
              
@@ -5424,7 +5516,7 @@ SUBROUTINE SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, A
 END SUBROUTINE SolveOption2a_Inp2BD
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine implements the first part of the "option 2" solve for inputs that apply to AeroDyn & InflowWind
-SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat, ErrMsg, WriteThisStep)
+SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat, ErrMsg, WriteThisStep)
    REAL(DbKi)              , intent(in   ) :: this_time           !< The current simulation time (actual or time of prediction)
    INTEGER(IntKi)          , intent(in   ) :: this_state          !< Index into the state array (current or predicted states)
 
@@ -5438,6 +5530,7 @@ SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, 
    TYPE(AeroDyn_Data),       INTENT(INOUT) :: AD                  !< AeroDyn data
    TYPE(InflowWind_Data),    INTENT(INOUT) :: IfW                 !< InflowWind data
    TYPE(OpenFOAM_Data),      INTENT(INOUT) :: OpFM                !< OpenFOAM data
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
 
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
@@ -5485,6 +5578,7 @@ SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, 
    
    IF (p_FAST%CompInflow == Module_IfW) THEN
       ! must be done after ED_CalcOutput and before AD_CalcOutput and SrvD
+!FIXME: add LidarSim wind points here:
       CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), AD%OtherSt(this_state), ED%y, ErrStat2, ErrMsg2 ) ! do we want this to be curr states
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    !ELSE IF ( p_FAST%CompInflow == Module_OpFM ) THEN
@@ -5499,7 +5593,7 @@ SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, 
 END SUBROUTINE SolveOption2b_Inp2IfW
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine implements the first part of the "option 2" solve for inputs that apply to AeroDyn and ServoDyn.
-SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, MeshMapData, ErrStat, ErrMsg, WriteThisStep)
+SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat, ErrMsg, WriteThisStep)
    REAL(DbKi)              , intent(in   ) :: this_time           !< The current simulation time (actual or time of prediction)
    INTEGER(IntKi)          , intent(in   ) :: this_state          !< Index into the state array (current or predicted states)
 
@@ -5514,6 +5608,7 @@ SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, 
    TYPE(AeroDyn_Data),       INTENT(INOUT) :: AD                  !< AeroDyn data
    TYPE(InflowWind_Data),    INTENT(INOUT) :: IfW                 !< InflowWind data
    TYPE(OpenFOAM_Data),      INTENT(INOUT) :: OpFM                !< OpenFOAM data
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules
    
    
@@ -5565,12 +5660,11 @@ SUBROUTINE SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, 
                        
    IF ( p_FAST%CompServo == Module_SrvD  ) THEN
 
-      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%y, IfW%y, OpFM%y, BD%y, SD%y, MeshMapData, ErrStat2, ErrMsg2 )
+      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%p, SrvD%Input(1), ED%y, IfW%y, OpFM%y, BD%y, SD%y, LidSim%y, MeshmapData, ErrStat2, ErrMsg2 )
 
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END IF
    
-!FIXME: add LidSim section here
 
 END SUBROUTINE SolveOption2c_Inp2AD_SrvD
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -5622,11 +5716,10 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       CALL SolveOption2a_Inp2BD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! compute AD position inputs; compute all of IfW inputs from ED/BD outputs: 
-!FIXME: add LidarSim wind points here:
-      CALL SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
+      CALL SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ! call IfW's CalcOutput; transfer wind-inflow inputs to AD; compute all of SrvD inputs: 
-      CALL SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
+      CALL SolveOption2c_Inp2AD_SrvD(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
   ! ELSE ! these subroutines are called in the AdvanceStates routine before BD, IfW, AD, and SrvD states are updated. This gives a more accurate solution that would otherwise require a correction step.
    END IF
@@ -5646,43 +5739,15 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       
 
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN
-      CALL Transfer_Point_to_Point( ED%y%NacelleMotion, LidSim%Input(1)%LidarMesh, MeshMapData%ED_P_2_LidSim_P_N, ErrStat2, ErrMsg2 )
-         call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-!FIXME: remove IfW, and add some above line to new routine for mapping over stuff?
-    CALL LidarSim_CalcOutput(this_time, LidSim%Input(1), LidSim%p, LidSim%x(this_state), LidSim%xd(this_state), &
+      CALL LidarSim_InputSolve( p_FAST, LidSim%Input(1), IfW%y, ED%y, SD%y, SrvD%y, MeshMapData, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CalcOutput(this_time, LidSim%Input(1), LidSim%p, LidSim%x(this_state), LidSim%xd(this_state), &
                            LidSim%z(this_state), LidSim%OtherSt(this_state), LidSim%y, LidSim%m,   &
                        IfW%p,IfW%x(this_state), IfW%xd(this_state), IfW%z(this_state), IfW%OtherSt(this_state), IfW%m,&
              ErrStat2, ErrMsg2)        
-       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      ! Additional signals for avrSWAP array
-      IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         SrvD%u%LidarMeas%NewData    = NINT(LidSim%y%SwapOutputs(1))
-         SrvD%u%LidarMeas%BeamID     = NINT(LidSim%y%SwapOutputs(2))
-         SrvD%u%LidarMeas%LdrRoll    = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 1 )
-         SrvD%u%LidarMeas%LdrPitch   = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 2 )
-         SrvD%u%LidarMeas%LdrYaw     = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 3 )
-         SrvD%u%LidarMeas%LdrXd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 4 )
-         SrvD%u%LidarMeas%LdrYd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 5 )
-         SrvD%u%LidarMeas%LdrZd      = LidSim%y%SwapOutputs( 2 + SrvD%p%GatesPerBeam + 6 )
-         if (allocated(SrvD%u%LidarMeas%Vlos)) then   ! Shouldn't be necessary here, but just in case
-            SrvD%u%LidarMeas%Vlos( 1:SrvD%p%GatesPerBeam ) = LidSim%y%SwapOutputs( 3:(2 + SrvD%p%GatesPerBeam) )
-         endif
-      END IF
-   ELSE
-      IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         SrvD%u%LidarMeas%NewData    = 0
-         SrvD%u%LidarMeas%BeamID     = 0
-         SrvD%u%LidarMeas%LdrRoll    = 0
-         SrvD%u%LidarMeas%LdrPitch   = 0
-         SrvD%u%LidarMeas%LdrYaw     = 0
-         SrvD%u%LidarMeas%LdrXd      = 0
-         SrvD%u%LidarMeas%LdrYd      = 0
-         SrvD%u%LidarMeas%LdrZd      = 0
-         if (allocated(SrvD%u%LidarMeas%Vlos)) then
-            SrvD%u%LidarMeas%Vlos       = 0
-         endif
-      END IF
-   END IF
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   ENDIF
+
    
 
    IF ( p_FAST%CompServo == Module_SrvD  ) THEN
@@ -5717,7 +5782,7 @@ END SUBROUTINE SolveOption2
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routines advances the states of each module
 SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, OpFM, HD, SD, ExtPtfm, &
-                               MAPp, FEAM, MD, Orca, IceF, IceD, MeshMapData, ErrStat, ErrMsg, WriteThisStep )
+                               MAPp, FEAM, MD, Orca, IceF, IceD, LidSim, MeshMapData, ErrStat, ErrMsg, WriteThisStep )
 
    REAL(DbKi),               INTENT(IN   ) :: t_initial           !< initial simulation time (almost always 0)
    INTEGER(IntKi),           INTENT(IN   ) :: n_t_global          !< integer time step   
@@ -5740,6 +5805,7 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, Sr
    TYPE(OrcaFlex_Data),      INTENT(INOUT) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(INOUT) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(INOUT) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(LidarSim_Data),      INTENT(INOUT) :: LidSim              !< Data for Lidar Simulator
    
    TYPE(FAST_ModuleMapType), INTENT(INOUT) :: MeshMapData         !< Data for mapping between modules (added to help BD get better root motion inputs)
 
@@ -5825,7 +5891,7 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, Sr
    
 
       ! because AeroDyn DBEMT states depend heavily on getting inputs correct, we are overwriting its inputs with updated structural outputs here
-   CALL SolveOption2b_Inp2IfW(t_global_next, STATE_PRED, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
+   CALL SolveOption2b_Inp2IfW(t_global_next, STATE_PRED, p_FAST, m_FAST, ED, BD, AD14, AD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
                         
@@ -5851,31 +5917,30 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, Sr
    END IF
 
 
-!!FIXME: Is this the right place for this?
-!    ! LidarSim: get predicted states
-!   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
-!      CALL LidarSim_CopyContState   (LdSim%x( STATE_CURR), LdSim%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      CALL LidarSim_CopyDiscState   (LdSim%xd(STATE_CURR), LdSim%xd(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      CALL LidarSim_CopyConstrState (LdSim%z( STATE_CURR), LdSim%z( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      CALL LidarSim_CopyOtherState( LdSim%OtherSt(STATE_CURR), LdSim%OtherSt(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
-!         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!
-!      DO j_ss = 1, p_FAST%n_substeps( MODULE_LdSim )
-!         n_t_module = n_t_global*p_FAST%n_substeps( MODULE_LdSim ) + j_ss - 1
-!         t_module   = n_t_module*p_FAST%dt_module( MODULE_LdSim ) + t_initial
-!
-!         CALL LidarSim_UpdateStates( t_module, n_t_module, LdSim%Input, LdSim%InputTimes, LdSim%p, LdSim%x(STATE_PRED), LdSim%xd(STATE_PRED), &
-!                                       LdSim%z(STATE_PRED), LdSim%OtherSt(STATE_PRED), LdSim%m, ErrStat2, ErrMsg2 )
-!            CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      END DO !j_ss
-!   END IF
+   ! LidarSim: get predicted states -- NOTE: LidarSim does not have states to update.
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      CALL LidarSim_CopyContState   (LidSim%x( STATE_CURR), LidSim%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyDiscState   (LidSim%xd(STATE_CURR), LidSim%xd(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyConstrState (LidSim%z( STATE_CURR), LidSim%z( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL LidarSim_CopyOtherState( LidSim%OtherSt(STATE_CURR), LidSim%OtherSt(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+      DO j_ss = 1, p_FAST%n_substeps( MODULE_LidSim )
+         n_t_module = n_t_global*p_FAST%n_substeps( MODULE_LidSim ) + j_ss - 1
+         t_module   = n_t_module*p_FAST%dt_module( MODULE_LidSim ) + t_initial
+
+         CALL LidarSim_UpdateStates( t_module, n_t_module, LidSim%Input, LidSim%InputTimes, LidSim%p, LidSim%x(STATE_PRED), LidSim%xd(STATE_PRED), &
+                                       LidSim%z(STATE_PRED), LidSim%OtherSt(STATE_PRED), LidSim%m, ErrStat2, ErrMsg2 )
+            CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      END DO !j_ss
+   END IF
 
 
       ! because AeroDyn DBEMT states depend heavily on getting inputs correct, we are overwriting its inputs with updated inflow outputs here
-   CALL SolveOption2c_Inp2AD_SrvD(t_global_next, STATE_PRED, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
+   CALL SolveOption2c_Inp2AD_SrvD(t_global_next, STATE_PRED, p_FAST, m_FAST, ED, BD, AD14, AD, SD, SrvD, IfW, OpFM, LidSim, MeshMapData, ErrStat2, ErrMsg2, WriteThisStep)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
    ! AeroDyn: get predicted states

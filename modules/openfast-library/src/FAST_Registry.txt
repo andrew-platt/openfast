@@ -123,7 +123,7 @@ typedef	^	FAST_ParameterType	IntKi	CompHydro	-	-	-	"Compute hydrodynamic loads (
 typedef	^	FAST_ParameterType	IntKi	CompSub	-	-	-	"Compute sub-structural dynamics (switch) {Module_None; Module_HD}"	-
 typedef	^	FAST_ParameterType	IntKi	CompMooring	-	-	-	"Compute mooring system (switch) {Module_None; Module_MAP; Module_FEAM; Module_MD; Module_Orca}"	-
 typedef	^	FAST_ParameterType	IntKi	CompIce	-	-	-	"Compute ice loading (switch) {Module_None; Module_IceF, Module_IceD}"	-
-typedef	^	FAST_ParameterType	IntKi	CompLidar	-	-	"Compute LidarSim Module (switch) {0 = Off, 1 = On}}"	-	
+typedef	^	FAST_ParameterType	IntKi	CompLidar	-	-	"Compute LidarSim Module (flag) {0 (None), 1 (nacelle mounted), 2 (hub mounted), 3 (ground mounted), or 4 (platform mounted)}"	-	
 typedef	^	FAST_ParameterType	IntKi	LidarMountLocation	-	LidarMount_None	-	"Lidar mounting location -- for mesh transfers {Lidar_None, LidarMount_Nacelle, LidarMount_Hub, LidarMount_Ground, LidarMount_Platform}"	-	
 typedef	^	FAST_ParameterType	LOGICAL	UseDWM	-	-	-	"Use the DWM module in AeroDyn"	-
 typedef	^	FAST_ParameterType	LOGICAL	Linearize	-	-	-	"Linearization analysis (flag)"	-
@@ -650,6 +650,11 @@ typedef	^	FAST_ModuleMapType	MeshMapType	SD_P_2_IceF_P	-	-	-	"Map SubDyn y2Mesh 
 # IceD <-> SD
 typedef	^	FAST_ModuleMapType	MeshMapType	IceD_P_2_SD_P	{:}	-	-	"Map IceDyn point mesh to SubDyn LMesh point mesh"
 typedef	^	FAST_ModuleMapType	MeshMapType	SD_P_2_IceD_P	{:}	-	-	"Map SubDyn y2Mesh point mesh to IceDyn point mesh"
+# ED --> LidarSim
+typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LS_P_N	-	-	-	"Map ElastoDyn Nacelle point motion mesh to LidarSim point motion mesh"
+typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LS_P_H	-	-	-	"Map ElastoDyn HubPtMotion point mesh to LidarSim point mesh"
+typedef	^	FAST_ModuleMapType	MeshMapType	ED_P_2_LS_P_P	-	-	-	"Map ElastoDyn platform point mesh motion to LidarSim point motion mesh"
+typedef	^	FAST_ModuleMapType	MeshMapType	SD_P_2_LS_P_P	-	-	-	"Map SubDyn    platform point mesh motion to LidarSim point motion mesh"
 # Stored Jacobians:
 typedef	^	FAST_ModuleMapType	ReKi	Jacobian_Opt1	{:}{:}	-	-	"Stored Jacobian in ED_HD_InputOutputSolve or FullOpt1_InputOutputSolve"
 typedef	^	FAST_ModuleMapType	Integer	Jacobian_pivot	{:}	-	-	"Pivot array used for LU decomposition of Jacobian_Opt1"
