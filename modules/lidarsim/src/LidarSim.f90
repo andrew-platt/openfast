@@ -230,7 +230,7 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
 END SUBROUTINE LidarSim_Init
 
-    !#########################################################################################################################################################################
+!#########################################################################################################################################################################
 
 SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates,  IfW_m,&
@@ -275,7 +275,7 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     CHARACTER(ErrMsgLen)                                            ::  TmpErrMsg
     
     !Initialize error values
-    ErrStat        =  0
+    ErrStat        =  ErrID_None
     ErrMsg         =  ""
 
     
@@ -292,7 +292,7 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
             UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector          
             UnitVector    =   UnitVector/NORM2(UnitVector)                      !=>Magnitude = 1
 
-            !Calculation of the wind speed at the calculated position
+            ! Calculation of the wind speed at the calculated position
             CALL LidarSim_CalculateVlos( p, UnitVector, Vlos, MeasuringPosition_I, LidarPosition_I, Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, TmpErrStat, TmpErrMsg) !Calculation of the line of sight wind speed
             CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)    
             CALL LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)    !Set all outputs to the output variable
@@ -318,9 +318,9 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     ENDIF
     m%MeasurementCurrentStep = m%MeasurementCurrentStep + 1
 
-    END SUBROUTINE LidarSim_CalcOutput
+END SUBROUTINE LidarSim_CalcOutput
 
-    !#########################################################################################################################################################################
+!#########################################################################################################################################################################
 
 SUBROUTINE LidarSim_End( InputData, p, ContStates, DiscStates, ConstrStateGuess, OtherStates, y, m, ErrStat, ErrMsg )
 

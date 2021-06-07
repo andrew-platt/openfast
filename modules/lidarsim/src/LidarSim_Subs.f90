@@ -1,4 +1,4 @@
-    MODULE LidarSim_Subs
+MODULE LidarSim_Subs
 
     USE LidarSim_Types
     USE NWTC_Library
@@ -19,7 +19,7 @@
     PUBLIC  ::  LidarSim_SetOutputs
     PUBLIC  ::  LidarSim_CalculateIMU
 
-    CONTAINS
+CONTAINS
     
 
 !#########################################################################################################################################################################
@@ -536,7 +536,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     CHARACTER(ErrMsgLen)                                    ::  ErrMsg2
 
     !Initialize error values
-    ErrStat        =  0
+    ErrStat        =  ErrID_None
     ErrMsg         =  ""
     
     CALL AllocAry(InputForCalculation%PositionXYZ, 3,1, 'InputForCalculation%PositionXYZ',ErrStat2, ErrMsg2)        !Allocating needed space for the input
@@ -550,19 +550,23 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
         MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
         DO Counter = 1, SIZE(p%Weighting)
 !QUESTION: is the p%WeightingDistance aout the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
-            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I                                                    !position of the weighted measuring point
+            ! position of the weighted measuring point
+            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
-            CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%Uref),&                                                                            !X vector to timeshift! X/Uref
-            InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )    !Calculation of the windspeed
+            CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%Uref), InputForCalculation, IfW_p, &
+                                    IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, &
+                                    IfW_m, .FALSE., ErrStat2, ErrMsg2 )
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
         END DO
     ELSE IF(IfW_p%WindType ==  3 .OR. IfW_p%WindType == 4) THEN        !Bladed Turublent 4 ( und TurbSim 3)
         DO Counter = 1, SIZE(p%Weighting)
-            
-            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I                                                    !position of the weighted measuring point
+            ! position of the weighted measuring point
+            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
-            CALL CalculateOutput(Time,&                                                                            !X vector to timeshift! X/Uref
-            InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )    !Calculation of the windspeed
+            CALL CalculateOutput(Time, InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, &
+                                       IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
         END DO
     END IF
@@ -572,21 +576,23 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     DEALLOCATE (OutputForCalculation%VelocityUVW)       !Free Ouput Positions for the next measurement
     DEALLOCATE (Vlos_tmp)
 
-    END SUBROUTINE LidarSim_CalculateVlos
+END SUBROUTINE LidarSim_CalculateVlos
     
     
 !#########################################################################################################################################################################       
     
-    SUBROUTINE LidarSim_CalculateIMU(p,y,u)
-    
-    IMPLICIT                                   NONE
-    CHARACTER(*),                              PARAMETER            ::  RoutineName="LidarSim_LidarSim_CalculateIMU"
-    
-    TYPE(LidarSim_ParameterType),              INTENT(IN   )        ::  p
-    TYPE(LidarSim_OutputType),                 INTENT(INOUT)        ::  y                       !Outputs computed at Time (IN for mesh reasons and data allocation)
-    TYPE(LidarSim_InputType),                  INTENT(IN   )        ::  u   
-    
-    ! local variables
+SUBROUTINE LidarSim_CalculateIMU(p,y,u)
+!FIXME: check this against 133f6a828599671b80b8b502b7974a302a8180ec
+!        There may have been some inadvertant change of the coordinate frame.  It is now returning the output in global, but local maybe be what is wanted!!!!
+
+   IMPLICIT                                   NONE
+   CHARACTER(*),                              PARAMETER            ::  RoutineName="LidarSim_LidarSim_CalculateIMU"
+
+   TYPE(LidarSim_ParameterType),              INTENT(IN   )        ::  p
+   TYPE(LidarSim_OutputType),                 INTENT(INOUT)        ::  y                       !Outputs computed at Time (IN for mesh reasons and data allocation)
+   TYPE(LidarSim_InputType),                  INTENT(IN   )        ::  u
+ 
+   ! local variables
    real(R8Ki)        :: theta(3)       ! roll, pitch, yaw
    real(R8Ki)                                                      ::  Rotation_L_I(3,3)
 !    REAL(ReKi)                                                      ::  CrossProduct(3)         !Variable for the crossproduct of the rotation and the lidar position ( in the nacelle coord. system)
@@ -597,7 +603,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
 !    REAL(ReKi)                                                      ::  DisplacementLidar(3)
 !    REAL(ReKi)                                                      ::  LidarPosition_I(3)
 
-    
+
    Rotation_L_I = MATMUL(u%LidarMesh%Orientation(:,:,1),transpose(u%LidarMesh%RefOrientation(:,:,1)))
 
    theta = EulerExtract( Rotation_L_I )
@@ -684,12 +690,12 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
 !   y%IMUOutputs(15)    = u%NacelleMotion%TranslationAcc(2,1) + CrossProduct(2)     !Acceleration y
 !   y%IMUOutputs(18)    = u%NacelleMotion%TranslationAcc(3,1) + CrossProduct(3)     !Acceleration z
 
-    END SUBROUTINE
+END SUBROUTINE
     
     
 !#########################################################################################################################################################################       
     
-    SUBROUTINE LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, ErrStat, ErrMsg)
+SUBROUTINE LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, ErrStat, ErrMsg)
     
     IMPLICIT                               NONE
     CHARACTER(*),                          PARAMETER       ::  RoutineName='LidarSim_InitializeOutputs'
@@ -859,12 +865,12 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     
     y%AllOutputs = 0
     
-    END SUBROUTINE LidarSim_InitializeOutputs
+END SUBROUTINE LidarSim_InitializeOutputs
     
     
 !#########################################################################################################################################################################  
     
-    SUBROUTINE LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)
+SUBROUTINE LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)
     
     IMPLICIT                                    NONE
     CHARACTER(*),                               PARAMETER       ::  RoutineName='LidarSim_SetOutputs'
@@ -915,9 +921,9 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     y%SwapOutputs( 2 + p%GatesPerBeam   + 5 )   = y%IMUOutputs( 14 )    ! LdrYd
     y%SwapOutputs( 2 + p%GatesPerBeam   + 6 )   = y%IMUOutputs( 17 )    ! LdrZd
     
-    END SUBROUTINE
+END SUBROUTINE
     
     
 !#########################################################################################################################################################################  
     
-    END MODULE LidarSim_Subs
+END MODULE LidarSim_Subs
