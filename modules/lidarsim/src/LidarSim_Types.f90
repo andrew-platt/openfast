@@ -48,6 +48,8 @@ IMPLICIT NONE
   TYPE, PUBLIC :: LidarSim_InitOutputType
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputHdr      !< Names of output-to-file channels [-]
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputUnt      !< Units of output-to-file channels [-]
+    INTEGER(IntKi)  :: NumWindPoints      !< total numer of wind measurement locations (all scanned locations) [-]
+    LOGICAL  :: UniformWindTest      !< Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only [-]
   END TYPE LidarSim_InitOutputType
 ! =======================
 ! =========  LidarSim_OutputType  =======
@@ -56,6 +58,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: SwapOutputs      !< Array with values to output to avrSwap array [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: AllOutputs      !< Array containing all possible outputs [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: IMUOutputs      !< Array containing Position, Velocity, and Acceleration of the lidar system [-]
+    TYPE(MeshType)  :: LidarMeasMesh      !< Motion Mesh of all measurement points -- for visualization and wind velocity inputs [-]
   END TYPE LidarSim_OutputType
 ! =======================
 ! =========  LidarSim_ParameterType  =======
@@ -70,11 +73,14 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: GatesPerBeam      !< Amount of gates per point [-]
     INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: ValidOutputs      !< List of valid output channels [-]
+    INTEGER(IntKi)  :: NumWindPoints      !< total numer of wind measurement locations (all scanned locations) [-]
+    LOGICAL  :: UniformWindTest      !< Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only [-]
   END TYPE LidarSim_ParameterType
 ! =======================
 ! =========  LidarSim_InputType  =======
   TYPE, PUBLIC :: LidarSim_InputType
     TYPE(MeshType)  :: LidarMesh      !< Lidar motion mesh (includes the orientation and position relative to the mounting point) [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: WindVelocity      !< Wind velocity at all measurement points [index 1: x,y,z, index 2: MeasMesh point number] [m/s]
   END TYPE LidarSim_InputType
 ! =======================
 ! =========  LidarSim_InputFile  =======
@@ -90,6 +96,7 @@ IMPLICIT NONE
     REAL(R8Ki)  :: PitchAngle      !< Pitch angle between the reference position and the lidar coordinate system [-]
     REAL(R8Ki)  :: YawAngle      !< Yaw   angle between the reference position and the lidar coordinate system [-]
     REAL(ReKi)  :: URef      !< Mean u-component wind speed at the reference height [m/s]
+    LOGICAL  :: UniformWindTest      !< Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only [-]
     REAL(ReKi)  :: t_measurement_interval      !< Time between each measurement [s]
     INTEGER(IntKi)  :: NumberOfPoints_Cartesian      !< Amount of Points [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: X_Cartesian_L      !< X Coordinate (Lidar coordinate system) [m]
@@ -114,6 +121,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: NextBeamID      !< BeamID for the next measurement [-]
     INTEGER(IntKi)  :: MeasurementCurrentStep      !< Current amount of time steps after last measurement [-]
     INTEGER(IntKi)  :: LastMeasuringPoint      !< Index of last measuring point [-]
+    TYPE(MeshMapType)  :: u_L_p2p_y_Lmeas      !< Mesh mapping from u%LidarMesh to y%LidarMeasMesh [-]
   END TYPE LidarSim_MiscVarType
 ! =======================
 ! =========  LidarSim_OtherStateType  =======
@@ -451,6 +459,8 @@ IF (ALLOCATED(SrcInitOutputData%WriteOutputUnt)) THEN
   END IF
     DstInitOutputData%WriteOutputUnt = SrcInitOutputData%WriteOutputUnt
 ENDIF
+    DstInitOutputData%NumWindPoints = SrcInitOutputData%NumWindPoints
+    DstInitOutputData%UniformWindTest = SrcInitOutputData%UniformWindTest
  END SUBROUTINE LidarSim_CopyInitOutput
 
  SUBROUTINE LidarSim_DestroyInitOutput( InitOutputData, ErrStat, ErrMsg )
@@ -515,6 +525,8 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! WriteOutputUnt upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%WriteOutputUnt)*LEN(InData%WriteOutputUnt)  ! WriteOutputUnt
   END IF
+      Int_BufSz  = Int_BufSz  + 1  ! NumWindPoints
+      Int_BufSz  = Int_BufSz  + 1  ! UniformWindTest
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -576,6 +588,10 @@ ENDIF
         END DO ! I
       END DO
   END IF
+    IntKiBuf(Int_Xferred) = InData%NumWindPoints
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%UniformWindTest, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_PackInitOutput
 
  SUBROUTINE LidarSim_UnPackInitOutput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -645,10 +661,14 @@ ENDIF
         END DO ! I
       END DO
   END IF
+    OutData%NumWindPoints = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%UniformWindTest = TRANSFER(IntKiBuf(Int_Xferred), OutData%UniformWindTest)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_UnPackInitOutput
 
  SUBROUTINE LidarSim_CopyOutput( SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg )
-   TYPE(LidarSim_OutputType), INTENT(IN) :: SrcOutputData
+   TYPE(LidarSim_OutputType), INTENT(INOUT) :: SrcOutputData
    TYPE(LidarSim_OutputType), INTENT(INOUT) :: DstOutputData
    INTEGER(IntKi),  INTENT(IN   ) :: CtrlCode
    INTEGER(IntKi),  INTENT(  OUT) :: ErrStat
@@ -710,6 +730,9 @@ IF (ALLOCATED(SrcOutputData%IMUOutputs)) THEN
   END IF
     DstOutputData%IMUOutputs = SrcOutputData%IMUOutputs
 ENDIF
+      CALL MeshCopy( SrcOutputData%LidarMeasMesh, DstOutputData%LidarMeasMesh, CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
  END SUBROUTINE LidarSim_CopyOutput
 
  SUBROUTINE LidarSim_DestroyOutput( OutputData, ErrStat, ErrMsg )
@@ -733,6 +756,7 @@ ENDIF
 IF (ALLOCATED(OutputData%IMUOutputs)) THEN
   DEALLOCATE(OutputData%IMUOutputs)
 ENDIF
+  CALL MeshDestroy( OutputData%LidarMeasMesh, ErrStat, ErrMsg )
  END SUBROUTINE LidarSim_DestroyOutput
 
  SUBROUTINE LidarSim_PackOutput( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -790,6 +814,24 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! IMUOutputs upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%IMUOutputs)  ! IMUOutputs
   END IF
+   ! Allocate buffers for subtypes, if any (we'll get sizes from these) 
+      Int_BufSz   = Int_BufSz + 3  ! LidarMeasMesh: size of buffers for each call to pack subtype
+      CALL MeshPack( InData%LidarMeasMesh, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, .TRUE. ) ! LidarMeasMesh 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! LidarMeasMesh
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! LidarMeasMesh
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! LidarMeasMesh
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -877,6 +919,34 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
+      CALL MeshPack( InData%LidarMeasMesh, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2, OnlySize ) ! LidarMeasMesh 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
  END SUBROUTINE LidarSim_PackOutput
 
  SUBROUTINE LidarSim_UnPackOutput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -978,6 +1048,46 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL MeshUnpack( OutData%LidarMeasMesh, Re_Buf, Db_Buf, Int_Buf, ErrStat2, ErrMsg2 ) ! LidarMeasMesh 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
  END SUBROUTINE LidarSim_UnPackOutput
 
  SUBROUTINE LidarSim_CopyParam( SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg )
@@ -1065,6 +1175,8 @@ IF (ALLOCATED(SrcParamData%ValidOutputs)) THEN
   END IF
     DstParamData%ValidOutputs = SrcParamData%ValidOutputs
 ENDIF
+    DstParamData%NumWindPoints = SrcParamData%NumWindPoints
+    DstParamData%UniformWindTest = SrcParamData%UniformWindTest
  END SUBROUTINE LidarSim_CopyParam
 
  SUBROUTINE LidarSim_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -1158,6 +1270,8 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! ValidOutputs upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%ValidOutputs)  ! ValidOutputs
   END IF
+      Int_BufSz  = Int_BufSz  + 1  ! NumWindPoints
+      Int_BufSz  = Int_BufSz  + 1  ! UniformWindTest
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -1282,6 +1396,10 @@ ENDIF
         Int_Xferred = Int_Xferred + 1
       END DO
   END IF
+    IntKiBuf(Int_Xferred) = InData%NumWindPoints
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%UniformWindTest, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_PackParam
 
  SUBROUTINE LidarSim_UnPackParam( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -1424,6 +1542,10 @@ ENDIF
         Int_Xferred = Int_Xferred + 1
       END DO
   END IF
+    OutData%NumWindPoints = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%UniformWindTest = TRANSFER(IntKiBuf(Int_Xferred), OutData%UniformWindTest)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_UnPackParam
 
  SUBROUTINE LidarSim_CopyInput( SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg )
@@ -1434,6 +1556,8 @@ ENDIF
    CHARACTER(*),    INTENT(  OUT) :: ErrMsg
 ! Local 
    INTEGER(IntKi)                 :: i,j,k
+   INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
+   INTEGER(IntKi)                 :: i2, i2_l, i2_u  !  bounds (upper/lower) for an array dimension 2
    INTEGER(IntKi)                 :: ErrStat2
    CHARACTER(ErrMsgLen)           :: ErrMsg2
    CHARACTER(*), PARAMETER        :: RoutineName = 'LidarSim_CopyInput'
@@ -1443,6 +1567,20 @@ ENDIF
       CALL MeshCopy( SrcInputData%LidarMesh, DstInputData%LidarMesh, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
+IF (ALLOCATED(SrcInputData%WindVelocity)) THEN
+  i1_l = LBOUND(SrcInputData%WindVelocity,1)
+  i1_u = UBOUND(SrcInputData%WindVelocity,1)
+  i2_l = LBOUND(SrcInputData%WindVelocity,2)
+  i2_u = UBOUND(SrcInputData%WindVelocity,2)
+  IF (.NOT. ALLOCATED(DstInputData%WindVelocity)) THEN 
+    ALLOCATE(DstInputData%WindVelocity(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%WindVelocity.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstInputData%WindVelocity = SrcInputData%WindVelocity
+ENDIF
  END SUBROUTINE LidarSim_CopyInput
 
  SUBROUTINE LidarSim_DestroyInput( InputData, ErrStat, ErrMsg )
@@ -1455,6 +1593,9 @@ ENDIF
   ErrStat = ErrID_None
   ErrMsg  = ""
   CALL MeshDestroy( InputData%LidarMesh, ErrStat, ErrMsg )
+IF (ALLOCATED(InputData%WindVelocity)) THEN
+  DEALLOCATE(InputData%WindVelocity)
+ENDIF
  END SUBROUTINE LidarSim_DestroyInput
 
  SUBROUTINE LidarSim_PackInput( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -1510,6 +1651,11 @@ ENDIF
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
+  Int_BufSz   = Int_BufSz   + 1     ! WindVelocity allocated yes/no
+  IF ( ALLOCATED(InData%WindVelocity) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*2  ! WindVelocity upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%WindVelocity)  ! WindVelocity
+  END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -1565,6 +1711,26 @@ ENDIF
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
+  IF ( .NOT. ALLOCATED(InData%WindVelocity) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%WindVelocity,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%WindVelocity,1)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%WindVelocity,2)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%WindVelocity,2)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i2 = LBOUND(InData%WindVelocity,2), UBOUND(InData%WindVelocity,2)
+        DO i1 = LBOUND(InData%WindVelocity,1), UBOUND(InData%WindVelocity,1)
+          ReKiBuf(Re_Xferred) = InData%WindVelocity(i1,i2)
+          Re_Xferred = Re_Xferred + 1
+        END DO
+      END DO
+  END IF
  END SUBROUTINE LidarSim_PackInput
 
  SUBROUTINE LidarSim_UnPackInput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -1580,6 +1746,8 @@ ENDIF
   INTEGER(IntKi)                 :: Db_Xferred
   INTEGER(IntKi)                 :: Int_Xferred
   INTEGER(IntKi)                 :: i
+  INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
+  INTEGER(IntKi)                 :: i2, i2_l, i2_u  !  bounds (upper/lower) for an array dimension 2
   INTEGER(IntKi)                 :: ErrStat2
   CHARACTER(ErrMsgLen)           :: ErrMsg2
   CHARACTER(*), PARAMETER        :: RoutineName = 'LidarSim_UnPackInput'
@@ -1633,6 +1801,29 @@ ENDIF
       IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! WindVelocity not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i2_l = IntKiBuf( Int_Xferred    )
+    i2_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%WindVelocity)) DEALLOCATE(OutData%WindVelocity)
+    ALLOCATE(OutData%WindVelocity(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%WindVelocity.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i2 = LBOUND(OutData%WindVelocity,2), UBOUND(OutData%WindVelocity,2)
+        DO i1 = LBOUND(OutData%WindVelocity,1), UBOUND(OutData%WindVelocity,1)
+          OutData%WindVelocity(i1,i2) = ReKiBuf(Re_Xferred)
+          Re_Xferred = Re_Xferred + 1
+        END DO
+      END DO
+  END IF
  END SUBROUTINE LidarSim_UnPackInput
 
  SUBROUTINE LidarSim_CopyInputFile( SrcInputFileData, DstInputFileData, CtrlCode, ErrStat, ErrMsg )
@@ -1662,6 +1853,7 @@ ENDIF
     DstInputFileData%PitchAngle = SrcInputFileData%PitchAngle
     DstInputFileData%YawAngle = SrcInputFileData%YawAngle
     DstInputFileData%URef = SrcInputFileData%URef
+    DstInputFileData%UniformWindTest = SrcInputFileData%UniformWindTest
     DstInputFileData%t_measurement_interval = SrcInputFileData%t_measurement_interval
     DstInputFileData%NumberOfPoints_Cartesian = SrcInputFileData%NumberOfPoints_Cartesian
 IF (ALLOCATED(SrcInputFileData%X_Cartesian_L)) THEN
@@ -1866,6 +2058,7 @@ ENDIF
       Db_BufSz   = Db_BufSz   + 1  ! PitchAngle
       Db_BufSz   = Db_BufSz   + 1  ! YawAngle
       Re_BufSz   = Re_BufSz   + 1  ! URef
+      Int_BufSz  = Int_BufSz  + 1  ! UniformWindTest
       Re_BufSz   = Re_BufSz   + 1  ! t_measurement_interval
       Int_BufSz  = Int_BufSz  + 1  ! NumberOfPoints_Cartesian
   Int_BufSz   = Int_BufSz   + 1     ! X_Cartesian_L allocated yes/no
@@ -1968,6 +2161,8 @@ ENDIF
     Db_Xferred = Db_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%URef
     Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%UniformWindTest, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%t_measurement_interval
     Re_Xferred = Re_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%NumberOfPoints_Cartesian
@@ -2178,6 +2373,8 @@ ENDIF
     Db_Xferred = Db_Xferred + 1
     OutData%URef = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
+    OutData%UniformWindTest = TRANSFER(IntKiBuf(Int_Xferred), OutData%UniformWindTest)
+    Int_Xferred = Int_Xferred + 1
     OutData%t_measurement_interval = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
     OutData%NumberOfPoints_Cartesian = IntKiBuf(Int_Xferred)
@@ -2366,7 +2563,7 @@ ENDIF
  END SUBROUTINE LidarSim_UnPackInputFile
 
  SUBROUTINE LidarSim_CopyMisc( SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg )
-   TYPE(LidarSim_MiscVarType), INTENT(IN) :: SrcMiscData
+   TYPE(LidarSim_MiscVarType), INTENT(INOUT) :: SrcMiscData
    TYPE(LidarSim_MiscVarType), INTENT(INOUT) :: DstMiscData
    INTEGER(IntKi),  INTENT(IN   ) :: CtrlCode
    INTEGER(IntKi),  INTENT(  OUT) :: ErrStat
@@ -2382,6 +2579,9 @@ ENDIF
     DstMiscData%NextBeamID = SrcMiscData%NextBeamID
     DstMiscData%MeasurementCurrentStep = SrcMiscData%MeasurementCurrentStep
     DstMiscData%LastMeasuringPoint = SrcMiscData%LastMeasuringPoint
+      CALL NWTC_Library_Copymeshmaptype( SrcMiscData%u_L_p2p_y_Lmeas, DstMiscData%u_L_p2p_y_Lmeas, CtrlCode, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+         IF (ErrStat>=AbortErrLev) RETURN
  END SUBROUTINE LidarSim_CopyMisc
 
  SUBROUTINE LidarSim_DestroyMisc( MiscData, ErrStat, ErrMsg )
@@ -2393,6 +2593,7 @@ ENDIF
 ! 
   ErrStat = ErrID_None
   ErrMsg  = ""
+  CALL NWTC_Library_Destroymeshmaptype( MiscData%u_L_p2p_y_Lmeas, ErrStat, ErrMsg )
  END SUBROUTINE LidarSim_DestroyMisc
 
  SUBROUTINE LidarSim_PackMisc( ReKiBuf, DbKiBuf, IntKiBuf, Indata, ErrStat, ErrMsg, SizeOnly )
@@ -2433,6 +2634,24 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1  ! NextBeamID
       Int_BufSz  = Int_BufSz  + 1  ! MeasurementCurrentStep
       Int_BufSz  = Int_BufSz  + 1  ! LastMeasuringPoint
+   ! Allocate buffers for subtypes, if any (we'll get sizes from these) 
+      Int_BufSz   = Int_BufSz + 3  ! u_L_p2p_y_Lmeas: size of buffers for each call to pack subtype
+      CALL NWTC_Library_Packmeshmaptype( Re_Buf, Db_Buf, Int_Buf, InData%u_L_p2p_y_Lmeas, ErrStat2, ErrMsg2, .TRUE. ) ! u_L_p2p_y_Lmeas 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN ! u_L_p2p_y_Lmeas
+         Re_BufSz  = Re_BufSz  + SIZE( Re_Buf  )
+         DEALLOCATE(Re_Buf)
+      END IF
+      IF(ALLOCATED(Db_Buf)) THEN ! u_L_p2p_y_Lmeas
+         Db_BufSz  = Db_BufSz  + SIZE( Db_Buf  )
+         DEALLOCATE(Db_Buf)
+      END IF
+      IF(ALLOCATED(Int_Buf)) THEN ! u_L_p2p_y_Lmeas
+         Int_BufSz = Int_BufSz + SIZE( Int_Buf )
+         DEALLOCATE(Int_Buf)
+      END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -2466,6 +2685,34 @@ ENDIF
     Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%LastMeasuringPoint
     Int_Xferred = Int_Xferred + 1
+      CALL NWTC_Library_Packmeshmaptype( Re_Buf, Db_Buf, Int_Buf, InData%u_L_p2p_y_Lmeas, ErrStat2, ErrMsg2, OnlySize ) ! u_L_p2p_y_Lmeas 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Re_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Re_Buf) > 0) ReKiBuf( Re_Xferred:Re_Xferred+SIZE(Re_Buf)-1 ) = Re_Buf
+        Re_Xferred = Re_Xferred + SIZE(Re_Buf)
+        DEALLOCATE(Re_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Db_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Db_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Db_Buf) > 0) DbKiBuf( Db_Xferred:Db_Xferred+SIZE(Db_Buf)-1 ) = Db_Buf
+        Db_Xferred = Db_Xferred + SIZE(Db_Buf)
+        DEALLOCATE(Db_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
+      IF(ALLOCATED(Int_Buf)) THEN
+        IntKiBuf( Int_Xferred ) = SIZE(Int_Buf); Int_Xferred = Int_Xferred + 1
+        IF (SIZE(Int_Buf) > 0) IntKiBuf( Int_Xferred:Int_Xferred+SIZE(Int_Buf)-1 ) = Int_Buf
+        Int_Xferred = Int_Xferred + SIZE(Int_Buf)
+        DEALLOCATE(Int_Buf)
+      ELSE
+        IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
+      ENDIF
  END SUBROUTINE LidarSim_PackMisc
 
  SUBROUTINE LidarSim_UnPackMisc( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -2500,6 +2747,46 @@ ENDIF
     Int_Xferred = Int_Xferred + 1
     OutData%LastMeasuringPoint = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Re_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Re_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Re_Buf = ReKiBuf( Re_Xferred:Re_Xferred+Buf_size-1 )
+        Re_Xferred = Re_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Db_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Db_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Db_Buf = DbKiBuf( Db_Xferred:Db_Xferred+Buf_size-1 )
+        Db_Xferred = Db_Xferred + Buf_size
+      END IF
+      Buf_size=IntKiBuf( Int_Xferred )
+      Int_Xferred = Int_Xferred + 1
+      IF(Buf_size > 0) THEN
+        ALLOCATE(Int_Buf(Buf_size),STAT=ErrStat2)
+        IF (ErrStat2 /= 0) THEN 
+           CALL SetErrStat(ErrID_Fatal, 'Error allocating Int_Buf.', ErrStat, ErrMsg,RoutineName)
+           RETURN
+        END IF
+        Int_Buf = IntKiBuf( Int_Xferred:Int_Xferred+Buf_size-1 )
+        Int_Xferred = Int_Xferred + Buf_size
+      END IF
+      CALL NWTC_Library_Unpackmeshmaptype( Re_Buf, Db_Buf, Int_Buf, OutData%u_L_p2p_y_Lmeas, ErrStat2, ErrMsg2 ) ! u_L_p2p_y_Lmeas 
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+        IF (ErrStat >= AbortErrLev) RETURN
+
+      IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
+      IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
+      IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
  END SUBROUTINE LidarSim_UnPackMisc
 
  SUBROUTINE LidarSim_CopyOtherState( SrcOtherStateData, DstOtherStateData, CtrlCode, ErrStat, ErrMsg )
@@ -3081,6 +3368,10 @@ ENDIF
  REAL(DbKi)                                 :: ScaleFactor ! temporary for extrapolation/interpolation
  INTEGER(IntKi)                             :: ErrStat2 ! local errors
  CHARACTER(ErrMsgLen)                       :: ErrMsg2  ! local errors
+ INTEGER                                    :: i01    ! dim1 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i02    ! dim2 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i1    ! dim1 counter variable for arrays
+ INTEGER                                    :: i2    ! dim2 counter variable for arrays
     ! Initialize ErrStat
  ErrStat = ErrID_None
  ErrMsg  = ""
@@ -3097,6 +3388,14 @@ ENDIF
    ScaleFactor = t_out / t(2)
       CALL MeshExtrapInterp1(u1%LidarMesh, u2%LidarMesh, tin, u_out%LidarMesh, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+IF (ALLOCATED(u_out%WindVelocity) .AND. ALLOCATED(u1%WindVelocity)) THEN
+  DO i2 = LBOUND(u_out%WindVelocity,2),UBOUND(u_out%WindVelocity,2)
+    DO i1 = LBOUND(u_out%WindVelocity,1),UBOUND(u_out%WindVelocity,1)
+      b = -(u1%WindVelocity(i1,i2) - u2%WindVelocity(i1,i2))
+      u_out%WindVelocity(i1,i2) = u1%WindVelocity(i1,i2) + b * ScaleFactor
+    END DO
+  END DO
+END IF ! check if allocated
  END SUBROUTINE LidarSim_Input_ExtrapInterp1
 
 
@@ -3132,6 +3431,10 @@ ENDIF
  INTEGER(IntKi)                             :: ErrStat2 ! local errors
  CHARACTER(ErrMsgLen)                       :: ErrMsg2  ! local errors
  CHARACTER(*),            PARAMETER         :: RoutineName = 'LidarSim_Input_ExtrapInterp2'
+ INTEGER                                    :: i01    ! dim1 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i02    ! dim2 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i1    ! dim1 counter variable for arrays
+ INTEGER                                    :: i2    ! dim2 counter variable for arrays
     ! Initialize ErrStat
  ErrStat = ErrID_None
  ErrMsg  = ""
@@ -3154,6 +3457,15 @@ ENDIF
    ScaleFactor = t_out / (t(2) * t(3) * (t(2) - t(3)))
       CALL MeshExtrapInterp2(u1%LidarMesh, u2%LidarMesh, u3%LidarMesh, tin, u_out%LidarMesh, tin_out, ErrStat2, ErrMsg2 )
         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+IF (ALLOCATED(u_out%WindVelocity) .AND. ALLOCATED(u1%WindVelocity)) THEN
+  DO i2 = LBOUND(u_out%WindVelocity,2),UBOUND(u_out%WindVelocity,2)
+    DO i1 = LBOUND(u_out%WindVelocity,1),UBOUND(u_out%WindVelocity,1)
+      b = (t(3)**2*(u1%WindVelocity(i1,i2) - u2%WindVelocity(i1,i2)) + t(2)**2*(-u1%WindVelocity(i1,i2) + u3%WindVelocity(i1,i2)))* scaleFactor
+      c = ( (t(2)-t(3))*u1%WindVelocity(i1,i2) + t(3)*u2%WindVelocity(i1,i2) - t(2)*u3%WindVelocity(i1,i2) ) * scaleFactor
+      u_out%WindVelocity(i1,i2) = u1%WindVelocity(i1,i2) + b  + c * t_out
+    END DO
+  END DO
+END IF ! check if allocated
  END SUBROUTINE LidarSim_Input_ExtrapInterp2
 
 
@@ -3173,7 +3485,7 @@ ENDIF
 !
 !..................................................................................................................................
 
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y(:) ! Output at t1 > t2 > t3
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y(:) ! Output at t1 > t2 > t3
  REAL(DbKi),                 INTENT(IN   )  :: t(:)           ! Times associated with the Outputs
  TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y_out ! Output at tin_out
  REAL(DbKi),                 INTENT(IN   )  :: t_out           ! time to be extrap/interp'd to
@@ -3220,8 +3532,8 @@ ENDIF
 !
 !..................................................................................................................................
 
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y1    ! Output at t1 > t2
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y2    ! Output at t2 
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y1    ! Output at t1 > t2
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y2    ! Output at t2 
  REAL(DbKi),         INTENT(IN   )          :: tin(2)   ! Times associated with the Outputs
  TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y_out ! Output at tin_out
  REAL(DbKi),         INTENT(IN   )          :: tin_out  ! time to be extrap/interp'd to
@@ -3275,6 +3587,8 @@ IF (ALLOCATED(y_out%IMUOutputs) .AND. ALLOCATED(y1%IMUOutputs)) THEN
     y_out%IMUOutputs(i1) = y1%IMUOutputs(i1) + b * ScaleFactor
   END DO
 END IF ! check if allocated
+      CALL MeshExtrapInterp1(y1%LidarMeasMesh, y2%LidarMeasMesh, tin, y_out%LidarMeasMesh, tin_out, ErrStat2, ErrMsg2 )
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  END SUBROUTINE LidarSim_Output_ExtrapInterp1
 
 
@@ -3292,9 +3606,9 @@ END IF ! check if allocated
 !
 !..................................................................................................................................
 
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y1      ! Output at t1 > t2 > t3
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y2      ! Output at t2 > t3
- TYPE(LidarSim_OutputType), INTENT(IN)  :: y3      ! Output at t3
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y1      ! Output at t1 > t2 > t3
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y2      ! Output at t2 > t3
+ TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y3      ! Output at t3
  REAL(DbKi),                 INTENT(IN   )  :: tin(3)    ! Times associated with the Outputs
  TYPE(LidarSim_OutputType), INTENT(INOUT)  :: y_out     ! Output at tin_out
  REAL(DbKi),                 INTENT(IN   )  :: tin_out   ! time to be extrap/interp'd to
@@ -3360,6 +3674,8 @@ IF (ALLOCATED(y_out%IMUOutputs) .AND. ALLOCATED(y1%IMUOutputs)) THEN
     y_out%IMUOutputs(i1) = y1%IMUOutputs(i1) + b  + c * t_out
   END DO
 END IF ! check if allocated
+      CALL MeshExtrapInterp2(y1%LidarMeasMesh, y2%LidarMeasMesh, y3%LidarMeasMesh, tin, y_out%LidarMeasMesh, tin_out, ErrStat2, ErrMsg2 )
+        CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
  END SUBROUTINE LidarSim_Output_ExtrapInterp2
 
 END MODULE LidarSim_Types

@@ -549,7 +549,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     IF(IfW_p%WindType == 1 .OR. IfW_p%WindType == 2)Then !Uniform Wind 2 (und steady 1)
         MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
         DO Counter = 1, SIZE(p%Weighting)
-!QUESTION: is the p%WeightingDistance aout the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
+!QUESTION: is the p%WeightingDistance about the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
             ! position of the weighted measuring point
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
@@ -700,7 +700,7 @@ SUBROUTINE LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, ErrStat, 
     IMPLICIT                               NONE
     CHARACTER(*),                          PARAMETER       ::  RoutineName='LidarSim_InitializeOutputs'
     
-    TYPE(LidarSim_OutputType),             INTENT(  OUT)   ::  y                   ! Parameter for lidar outputs
+    TYPE(LidarSim_OutputType),             INTENT(INOUT)   ::  y                   ! lidar outputs (IN since contains mesh info already)
     TYPE(LidarSim_ParameterType),          INTENT(INOUT)   ::  p                   ! Parameter data for the lidar module
     TYPE(LidarSim_InitOutputType),         INTENT(  OUT)   ::  InitOutData
     TYPE(LidarSim_InputFile),              INTENT(IN   )   ::  InputFileData

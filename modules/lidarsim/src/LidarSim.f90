@@ -111,41 +111,52 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
     ! Create the mesh for the u%LidarMotion mesh
    call Init_LidarMountMesh( InitInp, InputFileData, y, p, TmpErrStat, TmpErrMsg )
+   if (Failed())  return
 
 
-    !----- Calls different Subroutines to initialize the measuring points   
-    IF(InputFileData%TrajectoryType == 0) THEN
-        CALL LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, TmpErrStat, TmpErrMsg)    ! Calls Routine to initialize cartesian coordinate inputs
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    ELSEIF(InputFileData%TrajectoryType == 1)THEN
-        CALL LidarSim_InitMeasuringPoints_Spherical(p, InputFileData, TmpErrStat, TmpErrMsg )   ! Calls Routine to initialize spherical coordinate inputs
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    END IF
-    
-    !----- Calls different Subroutines to initialize the weighting points
-    IF(InputFileData%WeightingType == 0) THEN                                                   ! Single point
-        CALL AllocAry( p%WeightingDistance,1, 'p%WeightingDistance', TmpErrStat, TmpErrMsg )
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-        CALL AllocAry( p%Weighting,1, 'p%Weighting', TmpErrStat, TmpErrMsg )
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-        p%WeightingDistance(1) = 0
-        p%Weighting(1) = 1
-    ELSEIF(InputFileData%WeightingType == 1) THEN                                               ! Calls Routine to initialize the weighting with gaussian distribution
-        CALL LidarSim_InitializeWeightingGauss(p, InputFileData, TmpErrStat, TmpErrMsg )       
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    ELSEIF(InputFileData%WeightingType == 2) THEN
-        CALL LidarSim_InitializeWeightingManual(p, InputFileData, TmpErrStat, TmpErrMsg )       ! Calls Routine to initialize with manual weighting settings
-        CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    ENDIF
+   !----- Calls different Subroutines to initialize the measuring points
+   IF(InputFileData%TrajectoryType == 0) THEN
+      CALL LidarSim_InitMeasuringPoints_Cartesian(p, InputFileData, TmpErrStat, TmpErrMsg)    ! Calls Routine to initialize cartesian coordinate inputs
+      if (Failed())  return
+   ELSEIF(InputFileData%TrajectoryType == 1)THEN
+       CALL LidarSim_InitMeasuringPoints_Spherical(p, InputFileData, TmpErrStat, TmpErrMsg )   ! Calls Routine to initialize spherical coordinate inputs
+      if (Failed())  return
+   END IF
 
-    CALL LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, TmpErrStat, TmpErrMsg )
-    CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
-    
-    !initialize variables and outputs
-    m%MeasurementCurrentStep = -1                                                               !< there was no measurement yet
-    m%LastMeasuringPoint = 1                                                                    !< First measurement point
-    m%NextBeamID = 0
-    
+   !----- Calls different Subroutines to initialize the weighting points
+   IF(InputFileData%WeightingType == 0) THEN                                                   ! Single point
+       CALL AllocAry( p%WeightingDistance,1, 'p%WeightingDistance', TmpErrStat, TmpErrMsg )
+      if (Failed())  return
+       CALL AllocAry( p%Weighting,1, 'p%Weighting', TmpErrStat, TmpErrMsg )
+      if (Failed())  return
+       p%WeightingDistance(1) = 0
+       p%Weighting(1) = 1
+   ELSEIF(InputFileData%WeightingType == 1) THEN                                               ! Calls Routine to initialize the weighting with gaussian distribution
+       CALL LidarSim_InitializeWeightingGauss(p, InputFileData, TmpErrStat, TmpErrMsg )
+      if (Failed())  return
+   ELSEIF(InputFileData%WeightingType == 2) THEN
+       CALL LidarSim_InitializeWeightingManual(p, InputFileData, TmpErrStat, TmpErrMsg )       ! Calls Routine to initialize with manual weighting settings
+      if (Failed())  return
+   ENDIF
+
+   ! create mesh for the y%LidarMeasPos
+   !     This mesh is used for visualization and for retrieving wind velocity information
+   call Init_LidarMeasMesh( y, p, TmpErrStat, TmpErrMsg )
+   if (Failed())  return
+
+   ! create mesh mapping
+   call MeshMapCreate( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
+   if (Failed())  return
+
+   ! Initialize all outputs
+   CALL LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, TmpErrStat, TmpErrMsg )
+   if (Failed())  return
+
+   !initialize variables and outputs
+   m%MeasurementCurrentStep = -1                                                               !< there was no measurement yet
+   m%LastMeasuringPoint = 1                                                                    !< First measurement point
+   m%NextBeamID = 0
+
    call Cleanup()
    return
  
@@ -163,13 +174,13 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
    end subroutine Cleanup
 
-   subroutine Init_LidarMountMesh( InitInp, InputFileData, y, p, ErrStat, ErrMsg )
+   subroutine Init_LidarMountMesh( InitInp, InputFileData, y, p, ErrStat2, ErrMsg2 )
       TYPE(LidarSim_InitInputType),          INTENT(IN   )  :: InitInp           ! Input data for initialization routine
       TYPE(LidarSim_InputFile),              INTENT(IN   )  :: InputFileData     !< Structure to load the input file data into
       TYPE(LidarSim_ParameterType),          INTENT(INOUT)  :: p                 !< Parameters
       TYPE(LidarSim_OutputType),             INTENT(INOUT)  :: y                 !< Initial system outputs (outputs are not calculated;
-      INTEGER(IntKi),                        INTENT(  OUT)  :: ErrStat           !< Error status of the operation
-      CHARACTER(ErrMsgLen),                  INTENT(  OUT)  :: ErrMsg            !< Error message if ErrStat /= ErrID_None
+      INTEGER(IntKi),                        INTENT(  OUT)  :: ErrStat2           !< Error status of the operation
+      CHARACTER(ErrMsgLen),                  INTENT(  OUT)  :: ErrMsg2            !< Error message if ErrStat /= ErrID_None
 
       INTEGER(IntKi)                                        :: TmpErrStat
       CHARACTER(ErrMsgLen)                                  :: TmpErrMsg
@@ -204,11 +215,12 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
                      ,RotationVel       = .TRUE.            &
                      ,TranslationAcc    = .TRUE.            &
                      ,RotationAcc       = .TRUE.)
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         if (ErrStat2 >= AbortErrLev) return
 
       ! Create the node on the mesh
       CALL MeshPositionNode ( u%LidarMesh,1, Pos, TmpErrStat, TmpErrMsg, Orient )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
 
       ! Create the mesh element
       CALL MeshConstructElement (  u%LidarMesh         &
@@ -216,14 +228,78 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
                                   , TmpErrStat         &
                                   , TmpErrMsg          &
                                   , 1                  )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
       CALL MeshCommit ( u%LidarMesh         &
                       , TmpErrStat          &
                       , TmpErrMsg           )
-         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat, ErrMsg, RoutineName)
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
 
-      u%LidarMesh%RemapFlag  = .TRUE.
+      u%LidarMesh%TranslationDisp = 0.0_R8Ki
+      u%LidarMesh%TranslationVel  = 0.0_ReKi
+      u%LidarMesh%TranslationAcc  = 0.0_ReKi
+      u%LidarMesh%Orientation     = u%LidarMesh%RefOrientation
+      u%LidarMesh%RotationVel     = 0.0_ReKi
+      u%LidarMesh%RotationAcc     = 0.0_ReKi
+
+      u%LidarMesh%RemapFlag  = .false.
    end subroutine Init_LidarMountMesh
+
+   !> This creates a mesh with all the measurement points.  This is used in finding the wind velocity measurements
+   !! to pass in, and for visualization of the measurement locations.
+   subroutine Init_LidarMeasMesh( y, p, ErrStat2, ErrMsg2 )
+      type(LidarSim_ParameterType),          intent(in   )  :: p                 !< Parameters
+      type(LidarSim_OutputType),             intent(inout)  :: y                 !< Initial system outputs (outputs are not calculated;
+      integer(IntKi),                        intent(  out)  :: ErrStat2          !< Error status of the operation
+      character(ErrMsgLen),                  intent(  out)  :: ErrMsg2           !< Error message if ErrStat /= ErrID_None
+
+      integer(IntKi)                                        :: i                 !< generic counter
+      REAL(ReKi)                                            :: MeasPos_I(3)      !< Measuring Position in global coords
+      integer(IntKi)                                        :: TmpErrStat
+      character(ErrMsgLen)                                  :: TmpErrMsg
+      ! Initial error values
+      ErrStat     =  ErrID_None
+      ErrMsg      = ""
+
+      ! Create the input mesh for the Lidar unit
+      CALL MeshCreate( BlankMesh        = y%LidarMeasMesh               &
+                     ,IOS               = COMPONENT_OUTPUT              &
+                     ,Nnodes            = SIZE(p%MeasuringPoints_L,2)   &     ! total number of measurement points
+                     ,ErrStat           = TmpErrStat                    &
+                     ,ErrMess           = TmpErrMsg                     &
+                     ,TranslationDisp   = .TRUE.            &
+                     ,Orientation       = .false.           &
+                     ,TranslationVel    = .false.           &
+                     ,RotationVel       = .false.           &
+                     ,TranslationAcc    = .false.           &
+                     ,RotationAcc       = .false.           )
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         if (ErrStat2 >= AbortErrLev) return
+
+      do i=1,y%LidarMeasMesh%Nnodes
+         ! Get position in inertial coordinates:
+         MeasPos_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,i))
+
+         ! Create the node on the mesh
+         CALL MeshPositionNode ( y%LidarMeasMesh,i, MeasPos_I, TmpErrStat, TmpErrMsg )
+            CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+
+         ! Create the mesh element
+         CALL MeshConstructElement (  y%LidarMeasMesh     &
+                                     , ELEMENT_POINT      &
+                                     , TmpErrStat         &
+                                     , TmpErrMsg          &
+                                     , i                  )
+            CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+      enddo
+
+      CALL MeshCommit ( y%LidarMeasMesh     &
+                      , TmpErrStat          &
+                      , TmpErrMsg           )
+         CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+
+      y%LidarMeasMesh%TranslationDisp = 0.0_R8Ki
+      y%LidarMeasMesh%RemapFlag  = .false.
+   end subroutine Init_LidarMeasMesh
 
 END SUBROUTINE LidarSim_Init
 
@@ -275,15 +351,18 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     ErrStat        =  ErrID_None
     ErrMsg         =  ""
 
-    
+    ! update the output mesh
+    call Transfer_Point_to_Point( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
+    call SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+
     IF(m%MeasurementCurrentStep>=p%MeasurementMaxSteps .OR. m%MeasurementCurrentStep == -1)THEN         !Check if there must be a new measurement     !(NINT(Time*1000)-NINT(p%t_last_measurement*1000)) >= NINT(p%t_measurement_interval*1000)
         m%MeasurementCurrentStep = 0
         LidarPosition_I =  u%LidarMesh%Position(1:3,1) + u%LidarMesh%TranslationDisp(1:3,1)
 
         CALL LidarSim_CalculateIMU(p, y, u)
         DO LoopGatesPerBeam = 0,p%GatesPerBeam-1
-            !Transform measuring and lidar measurement position to the inertial system
-            MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
+            ! lidar measurement position in inertial coordinates
+            MeasuringPosition_I = y%LidarMeasMesh%Position(:,m%LastMeasuringPoint+LoopGatesPerBeam) + y%LidarMeasMesh%TranslationDisp(:,m%LastMeasuringPoint+LoopGatesPerBeam)
 
             !Line of Sight
             UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector          

@@ -12,16 +12,19 @@ typedef  ^                 InitInputtype     FileInfoType         PassedFileData
  ..... LidarSim_InitOutputType data .......................................................................................................
 typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr   :   -   -   "Names of output-to-file channels"   -
 typedef  ^                 InitOutputType    CHARACTER(ChanLen)   WriteOutputUnt   :   -   -   "Units of output-to-file channels"   -
+typedef  ^                 InitOutputType    IntKi                NumWindPoints    -   -   -   "total numer of wind measurement locations (all scanned locations)"   -
+typedef  ^                 InitOutputType    LOGICAL              UniformWindTest  -   -   -   "Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only" -
 
  ..... LidarSim_OutputType data .......................................................................................................
 typedef  LidarSim/LidarSim OutputType     ReKi     WriteOutput          :   -   -   "Array with values to output to file"   -
 typedef  ^                 OutputType     ReKi     SwapOutputs          :   -   -   "Array with values to output to avrSwap array"   -
 typedef  ^                 OutputType     ReKi     AllOutputs           :   -   -   "Array containing all possible outputs"   -
-typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   -   "Array containing Position, Velocity, and Acceleration of the lidar system"
+typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   -   "Array containing Position, Velocity, and Acceleration of the lidar system" -
+typedef  ^                 OutputType     MeshType LidarMeasMesh        -   -   -   "Motion Mesh of all measurement points -- for visualization and wind velocity inputs" -
 
  ..... LidarSim_ParameterType data .......................................................................................................
 typedef  LidarSim/LidarSim ParameterType  IntKi    MeasurementMaxSteps           -        -   -   "Time steps between lidar measurements" -
-typedef	^	               ParameterType	CHARACTER(1024)	RootName	            -	      -	 -	  "RootName for writing output files"	-
+typedef  ^                 ParameterType  CHARACTER(1024)  RootName              -        -   -   "RootName for writing output files"  -
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_L             {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3"   m
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_Spherical_L   {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3 (spherical representation)"   "m deg deg"
 typedef  ^                 ParameterType  ReKi     WeightingDistance             {:}      -   -   "Distances to evalute for the weighting"   m
@@ -30,11 +33,12 @@ typedef  ^                 ParameterType  ReKi     URef                         
 typedef  ^                 ParameterType  IntKi    GatesPerBeam                  -        -   -   "Amount of gates per point" -
 typedef  ^                 ParameterType  IntKi    MAXDLLChainOutputs            -        -   -   "Number of entries in the avrSWAP reserved for the DLL chain" -
 typedef  ^                 ParameterType  IntKi    ValidOutputs                  {:}      -   -   "List of valid output channels" -
+typedef  ^                 ParameterType  IntKi    NumWindPoints                 -        -   -   "total numer of wind measurement locations (all scanned locations)"   -
+typedef  ^                 ParameterType  LOGICAL  UniformWindTest               -        -   -   "Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only" -
 
  ..... LidarSim_InputType data .......................................................................................................
-#FIXME: change this to LidarMotion
-typedef  LidarSim/LidarSim InputType   MeshType   LidarMesh             -  -  -  "Lidar motion mesh (includes the orientation and position relative to the mounting point)" -
-#FIXME: add velocity info from IfW here
+typedef  LidarSim/LidarSim InputType      MeshType LidarMesh                     -        -   -   "Lidar motion mesh (includes the orientation and position relative to the mounting point)" -
+typedef  ^                 InputType      ReKi     WindVelocity                  {:}{:}   -   -   "Wind velocity at all measurement points [index 1: x,y,z, index 2: MeasMesh point number]" m/s
  
  ..... LidarSim_InputFile data .......................................................................................................
 typedef  LidarSim/LidarSim LidarSim_InputFile  LOGICAL  Echo                       -   -   -   "Echo input data to <RootName>.ech"   -
@@ -48,6 +52,7 @@ typedef  ^                 LidarSim_InputFile  R8Ki     RollAngle               
 typedef  ^                 LidarSim_InputFile  R8Ki     PitchAngle                 -   -   -   "Pitch angle between the reference position and the lidar coordinate system"   -
 typedef  ^                 LidarSim_InputFile  R8Ki     YawAngle                   -   -   -   "Yaw   angle between the reference position and the lidar coordinate system"   -
 typedef  ^                 LidarSim_InputFile  ReKi     URef                       -   -   -   "Mean u-component wind speed at the reference height" m/s
+typedef  ^                 LidarSim_InputFile  LOGICAL  UniformWindTest            -   -   -   "Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only" -
 typedef  ^                 LidarSim_InputFile  ReKi     t_measurement_interval     -   -   -   "Time between each measurement"   s
 ######################         Measuring Points         #############################################
 typedef  ^                 LidarSim_InputFile  IntKi    NumberOfPoints_Cartesian   -      -   -   "Amount of Points" -
@@ -74,6 +79,7 @@ typedef  ^                 LidarSim_InputFile  IntKi          NumOuts           
 typedef  LidarSim/LidarSim MiscVarType    IntKi    NextBeamID                 -      -   -   "BeamID for the next measurement" -
 typedef  ^                 MiscVarType    IntKi    MeasurementCurrentStep     -      -   -   "Current amount of time steps after last measurement" -
 typedef  ^                 MiscVarType    IntKi    LastMeasuringPoint         -      -   -   "Index of last measuring point"   -
+typedef  ^                 MiscVarType    MeshMapType    u_L_p2p_y_Lmeas      -      -   -   "Mesh mapping from u%LidarMesh to y%LidarMeasMesh" -
 
 
 
