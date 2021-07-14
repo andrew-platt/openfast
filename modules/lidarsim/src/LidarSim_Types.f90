@@ -62,8 +62,6 @@ IMPLICIT NONE
   TYPE, PUBLIC :: LidarSim_ParameterType
     INTEGER(IntKi)  :: MeasurementMaxSteps      !< Time steps between lidar measurements [-]
     CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
-    REAL(ReKi)  :: LidarPosition_N(3)      !< Lidar position in the nacelle coordinates [m]
-    REAL(DbKi)  :: LidarOrientation_N(3,3)      !< orientation of the lidar system in the nacelle coordinate system [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MeasuringPoints_L      !< 2D Array of all measuringpoints, first dimension is always 3 [m]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MeasuringPoints_Spherical_L      !< 2D Array of all measuringpoints, first dimension is always 3 (spherical representation) [m deg deg]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WeightingDistance      !< Distances to evalute for the weighting [m]
@@ -85,12 +83,12 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     INTEGER(IntKi)  :: TrajectoryType      !< Switch : {0 = cartesian coordinates; 1 = spherical coordinates} [-]
     INTEGER(IntKi)  :: WeightingType      !< Switch : {0 = single point; 1 = gaussian distribution} [-]
-    REAL(ReKi)  :: LidarPositionX_N      !< Units of output-to-file channels [-]
-    REAL(ReKi)  :: LidarPositionY_N      !< Names of output-to-file channels [-]
-    REAL(ReKi)  :: LidarPositionZ_N      !< Units of output-to-file channels [-]
-    REAL(R8Ki)  :: RollAngle_N      !< Roll  angle between the reference position and the lidar coordinate system [-]
-    REAL(R8Ki)  :: PitchAngle_N      !< Pitch angle between the reference position and the lidar coordinate system [-]
-    REAL(R8Ki)  :: YawAngle_N      !< Yaw   angle between the reference position and the lidar coordinate system [-]
+    REAL(ReKi)  :: LidarPositionX      !< Units of output-to-file channels [-]
+    REAL(ReKi)  :: LidarPositionY      !< Names of output-to-file channels [-]
+    REAL(ReKi)  :: LidarPositionZ      !< Units of output-to-file channels [-]
+    REAL(R8Ki)  :: RollAngle      !< Roll  angle between the reference position and the lidar coordinate system [-]
+    REAL(R8Ki)  :: PitchAngle      !< Pitch angle between the reference position and the lidar coordinate system [-]
+    REAL(R8Ki)  :: YawAngle      !< Yaw   angle between the reference position and the lidar coordinate system [-]
     REAL(ReKi)  :: URef      !< Mean u-component wind speed at the reference height [m/s]
     REAL(ReKi)  :: t_measurement_interval      !< Time between each measurement [s]
     INTEGER(IntKi)  :: NumberOfPoints_Cartesian      !< Amount of Points [-]
@@ -1000,8 +998,6 @@ ENDIF
    ErrMsg  = ""
     DstParamData%MeasurementMaxSteps = SrcParamData%MeasurementMaxSteps
     DstParamData%RootName = SrcParamData%RootName
-    DstParamData%LidarPosition_N(3) = SrcParamData%LidarPosition_N(3)
-    DstParamData%LidarOrientation_N(3,3) = SrcParamData%LidarOrientation_N(3,3)
 IF (ALLOCATED(SrcParamData%MeasuringPoints_L)) THEN
   i1_l = LBOUND(SrcParamData%MeasuringPoints_L,1)
   i1_u = UBOUND(SrcParamData%MeasuringPoints_L,1)
@@ -1134,8 +1130,6 @@ ENDIF
   Int_BufSz  = 0
       Int_BufSz  = Int_BufSz  + 1  ! MeasurementMaxSteps
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%RootName)  ! RootName
-      Re_BufSz   = Re_BufSz   + 1  ! LidarPosition_N(3)
-      Db_BufSz   = Db_BufSz   + 1  ! LidarOrientation_N(3,3)
   Int_BufSz   = Int_BufSz   + 1     ! MeasuringPoints_L allocated yes/no
   IF ( ALLOCATED(InData%MeasuringPoints_L) ) THEN
     Int_BufSz   = Int_BufSz   + 2*2  ! MeasuringPoints_L upper/lower bounds for each dimension
@@ -1197,10 +1191,6 @@ ENDIF
       IntKiBuf(Int_Xferred) = ICHAR(InData%RootName(I:I), IntKi)
       Int_Xferred = Int_Xferred + 1
     END DO ! I
-    ReKiBuf(Re_Xferred) = InData%LidarPosition_N(3)
-    Re_Xferred = Re_Xferred + 1
-    DbKiBuf(Db_Xferred) = InData%LidarOrientation_N(3,3)
-    Db_Xferred = Db_Xferred + 1
   IF ( .NOT. ALLOCATED(InData%MeasuringPoints_L) ) THEN
     IntKiBuf( Int_Xferred ) = 0
     Int_Xferred = Int_Xferred + 1
@@ -1328,10 +1318,6 @@ ENDIF
       OutData%RootName(I:I) = CHAR(IntKiBuf(Int_Xferred))
       Int_Xferred = Int_Xferred + 1
     END DO ! I
-    OutData%LidarPosition_N(3) = ReKiBuf(Re_Xferred)
-    Re_Xferred = Re_Xferred + 1
-    OutData%LidarOrientation_N(3,3) = DbKiBuf(Db_Xferred)
-    Db_Xferred = Db_Xferred + 1
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! MeasuringPoints_L not allocated
     Int_Xferred = Int_Xferred + 1
   ELSE
@@ -1669,12 +1655,12 @@ ENDIF
     DstInputFileData%MAXDLLChainOutputs = SrcInputFileData%MAXDLLChainOutputs
     DstInputFileData%TrajectoryType = SrcInputFileData%TrajectoryType
     DstInputFileData%WeightingType = SrcInputFileData%WeightingType
-    DstInputFileData%LidarPositionX_N = SrcInputFileData%LidarPositionX_N
-    DstInputFileData%LidarPositionY_N = SrcInputFileData%LidarPositionY_N
-    DstInputFileData%LidarPositionZ_N = SrcInputFileData%LidarPositionZ_N
-    DstInputFileData%RollAngle_N = SrcInputFileData%RollAngle_N
-    DstInputFileData%PitchAngle_N = SrcInputFileData%PitchAngle_N
-    DstInputFileData%YawAngle_N = SrcInputFileData%YawAngle_N
+    DstInputFileData%LidarPositionX = SrcInputFileData%LidarPositionX
+    DstInputFileData%LidarPositionY = SrcInputFileData%LidarPositionY
+    DstInputFileData%LidarPositionZ = SrcInputFileData%LidarPositionZ
+    DstInputFileData%RollAngle = SrcInputFileData%RollAngle
+    DstInputFileData%PitchAngle = SrcInputFileData%PitchAngle
+    DstInputFileData%YawAngle = SrcInputFileData%YawAngle
     DstInputFileData%URef = SrcInputFileData%URef
     DstInputFileData%t_measurement_interval = SrcInputFileData%t_measurement_interval
     DstInputFileData%NumberOfPoints_Cartesian = SrcInputFileData%NumberOfPoints_Cartesian
@@ -1873,12 +1859,12 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1  ! MAXDLLChainOutputs
       Int_BufSz  = Int_BufSz  + 1  ! TrajectoryType
       Int_BufSz  = Int_BufSz  + 1  ! WeightingType
-      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionX_N
-      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionY_N
-      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionZ_N
-      Db_BufSz   = Db_BufSz   + 1  ! RollAngle_N
-      Db_BufSz   = Db_BufSz   + 1  ! PitchAngle_N
-      Db_BufSz   = Db_BufSz   + 1  ! YawAngle_N
+      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionX
+      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionY
+      Re_BufSz   = Re_BufSz   + 1  ! LidarPositionZ
+      Db_BufSz   = Db_BufSz   + 1  ! RollAngle
+      Db_BufSz   = Db_BufSz   + 1  ! PitchAngle
+      Db_BufSz   = Db_BufSz   + 1  ! YawAngle
       Re_BufSz   = Re_BufSz   + 1  ! URef
       Re_BufSz   = Re_BufSz   + 1  ! t_measurement_interval
       Int_BufSz  = Int_BufSz  + 1  ! NumberOfPoints_Cartesian
@@ -1968,17 +1954,17 @@ ENDIF
     Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%WeightingType
     Int_Xferred = Int_Xferred + 1
-    ReKiBuf(Re_Xferred) = InData%LidarPositionX_N
+    ReKiBuf(Re_Xferred) = InData%LidarPositionX
     Re_Xferred = Re_Xferred + 1
-    ReKiBuf(Re_Xferred) = InData%LidarPositionY_N
+    ReKiBuf(Re_Xferred) = InData%LidarPositionY
     Re_Xferred = Re_Xferred + 1
-    ReKiBuf(Re_Xferred) = InData%LidarPositionZ_N
+    ReKiBuf(Re_Xferred) = InData%LidarPositionZ
     Re_Xferred = Re_Xferred + 1
-    DbKiBuf(Db_Xferred) = InData%RollAngle_N
+    DbKiBuf(Db_Xferred) = InData%RollAngle
     Db_Xferred = Db_Xferred + 1
-    DbKiBuf(Db_Xferred) = InData%PitchAngle_N
+    DbKiBuf(Db_Xferred) = InData%PitchAngle
     Db_Xferred = Db_Xferred + 1
-    DbKiBuf(Db_Xferred) = InData%YawAngle_N
+    DbKiBuf(Db_Xferred) = InData%YawAngle
     Db_Xferred = Db_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%URef
     Re_Xferred = Re_Xferred + 1
@@ -2178,17 +2164,17 @@ ENDIF
     Int_Xferred = Int_Xferred + 1
     OutData%WeightingType = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
-    OutData%LidarPositionX_N = ReKiBuf(Re_Xferred)
+    OutData%LidarPositionX = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
-    OutData%LidarPositionY_N = ReKiBuf(Re_Xferred)
+    OutData%LidarPositionY = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
-    OutData%LidarPositionZ_N = ReKiBuf(Re_Xferred)
+    OutData%LidarPositionZ = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
-    OutData%RollAngle_N = REAL(DbKiBuf(Db_Xferred), R8Ki)
+    OutData%RollAngle = REAL(DbKiBuf(Db_Xferred), R8Ki)
     Db_Xferred = Db_Xferred + 1
-    OutData%PitchAngle_N = REAL(DbKiBuf(Db_Xferred), R8Ki)
+    OutData%PitchAngle = REAL(DbKiBuf(Db_Xferred), R8Ki)
     Db_Xferred = Db_Xferred + 1
-    OutData%YawAngle_N = REAL(DbKiBuf(Db_Xferred), R8Ki)
+    OutData%YawAngle = REAL(DbKiBuf(Db_Xferred), R8Ki)
     Db_Xferred = Db_Xferred + 1
     OutData%URef = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1

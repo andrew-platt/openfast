@@ -107,17 +107,17 @@ SUBROUTINE LidarSim_ParsePrimaryFileInfo( PriPath, InputFile, RootName, FileInfo
          if (Failed()) return
    call ParseVar( FileInfo, CurLine, 'WeightingType', InputFileData%WeightingType, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'LidarPositionX_N', InputFileData%LidarPositionX_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'LidarPositionX', InputFileData%LidarPositionX, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'LidarPositionY_N', InputFileData%LidarPositionY_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'LidarPositionY', InputFileData%LidarPositionY, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'LidarPositionZ_N', InputFileData%LidarPositionZ_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'LidarPositionZ', InputFileData%LidarPositionZ, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'RollAngle_N', InputFileData%RollAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'RollAngle', InputFileData%RollAngle, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'PitchAngle_N', InputFileData%PitchAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'PitchAngle', InputFileData%PitchAngle, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'YawAngle_N', InputFileData%YawAngle_N, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVar( FileInfo, CurLine, 'YawAngle', InputFileData%YawAngle, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
    call ParseVar( FileInfo, CurLine, 'URef', InputFileData%URef, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return

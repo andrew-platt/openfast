@@ -22,9 +22,6 @@ typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   
  ..... LidarSim_ParameterType data .......................................................................................................
 typedef  LidarSim/LidarSim ParameterType  IntKi    MeasurementMaxSteps           -        -   -   "Time steps between lidar measurements" -
 typedef	^	               ParameterType	CHARACTER(1024)	RootName	            -	      -	 -	  "RootName for writing output files"	-
-#FIXME: remove the next two lines!!!!
-typedef  ^                 ParameterType  ReKi     LidarPosition_N(3)            -        -   -   "Lidar position in the nacelle coordinates"   m
-typedef  ^                 ParameterType  DbKi     LidarOrientation_N(3,3)       -        -   -   "orientation of the lidar system in the nacelle coordinate system"   -
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_L             {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3"   m
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_Spherical_L   {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3 (spherical representation)"   "m deg deg"
 typedef  ^                 ParameterType  ReKi     WeightingDistance             {:}      -   -   "Distances to evalute for the weighting"   m
@@ -44,12 +41,12 @@ typedef  LidarSim/LidarSim LidarSim_InputFile  LOGICAL  Echo                    
 typedef  ^                 LidarSim_InputFile  IntKi    MAXDLLChainOutputs         -   -   -   "Number of entries in the avrSWAP reserved for the DLL chain" -
 typedef  ^                 LidarSim_InputFile  IntKi    TrajectoryType             -   -   -   "Switch : {0 = cartesian coordinates; 1 = spherical coordinates}"   -
 typedef  ^                 LidarSim_InputFile  IntKi    WeightingType              -   -   -   "Switch : {0 = single point; 1 = gaussian distribution}"   -
-typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionX_N           -   -   -   "Units of output-to-file channels"   -
-typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionY_N           -   -   -   "Names of output-to-file channels"   -
-typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionZ_N           -   -   -   "Units of output-to-file channels"   -
-typedef  ^                 LidarSim_InputFile  R8Ki     RollAngle_N                -   -   -   "Roll  angle between the reference position and the lidar coordinate system"   -
-typedef  ^                 LidarSim_InputFile  R8Ki     PitchAngle_N               -   -   -   "Pitch angle between the reference position and the lidar coordinate system"   -
-typedef  ^                 LidarSim_InputFile  R8Ki     YawAngle_N                 -   -   -   "Yaw   angle between the reference position and the lidar coordinate system"   -
+typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionX             -   -   -   "Units of output-to-file channels"   -
+typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionY             -   -   -   "Names of output-to-file channels"   -
+typedef  ^                 LidarSim_InputFile  ReKi     LidarPositionZ             -   -   -   "Units of output-to-file channels"   -
+typedef  ^                 LidarSim_InputFile  R8Ki     RollAngle                  -   -   -   "Roll  angle between the reference position and the lidar coordinate system"   -
+typedef  ^                 LidarSim_InputFile  R8Ki     PitchAngle                 -   -   -   "Pitch angle between the reference position and the lidar coordinate system"   -
+typedef  ^                 LidarSim_InputFile  R8Ki     YawAngle                   -   -   -   "Yaw   angle between the reference position and the lidar coordinate system"   -
 typedef  ^                 LidarSim_InputFile  ReKi     URef                       -   -   -   "Mean u-component wind speed at the reference height" m/s
 typedef  ^                 LidarSim_InputFile  ReKi     t_measurement_interval     -   -   -   "Time between each measurement"   s
 ######################         Measuring Points         #############################################

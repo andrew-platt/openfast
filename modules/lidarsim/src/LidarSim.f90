@@ -94,9 +94,9 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
 
    ! Convert angles read in degrees to radians
-   InputFileData%RollAngle_N  =  InputFileData%RollAngle_N  *  D2R_D
-   InputFileData%PitchAngle_N =  InputFileData%PitchAngle_N *  D2R_D
-   InputFileData%YawAngle_N   =  InputFileData%YawAngle_N   *  D2R_D
+   InputFileData%RollAngle  =  InputFileData%RollAngle  *  D2R_D
+   InputFileData%PitchAngle =  InputFileData%PitchAngle *  D2R_D
+   InputFileData%YawAngle   =  InputFileData%YawAngle   *  D2R_D
    do i=1,InputFileData%NumberOfPoints_Spherical
       InputFileData%Azimuth(i)   = InputFileData%Azimuth(i)   * D2R_D
       InputFileData%Elevation(i) = InputFileData%Elevation(i) * D2R_D
@@ -104,9 +104,6 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
  
     !Transfering InputFileData to the p
     p%MeasurementMaxSteps   =   CEILING(REAL(NINT(InputFileData%t_measurement_interval*100000))/REAL(NINT(InitInp%DT*100000))) !NINT to remove float precision errors. Back to REAL, otherwise the divion ignores everything behind the decima point. Ceiling to round up to next integer
-    p%LidarPosition_N(1)    =   InputFileData%LidarPositionX_N
-    p%LidarPosition_N(2)    =   InputFileData%LidarPositionY_N
-    p%LidarPosition_N(3)    =   InputFileData%LidarPositionZ_N
     p%URef                  =   InputFileData%URef
     p%GatesPerBeam          =   InputFileData%GatesPerBeam
 !FIXME: can we add some error checking on this to make sure it is a sane value?
@@ -190,8 +187,8 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
       !---------------------------------------
       ! Position of the lidar module in global coordinates
-      Pos      =  p%LidarPosition_N + InitInp%LidarRefPosition
-      theta    = (/ InputFileData%RollAngle_N, InputFileData%PitchAngle_N, InputFileData%YawAngle_N /)
+      Pos      =  InitInp%LidarRefPosition + (/ InputFileData%LidarPositionX, InputFileData%LidarPositionY, InputFileData%LidarPositionZ /)
+      theta    = (/ InputFileData%RollAngle, InputFileData%PitchAngle, InputFileData%YawAngle /)
       Orient   = EulerConstruct(theta)
       Orient   =  MATMUL( transpose(Orient), InitInp%LidarRefOrientation )
 
