@@ -234,8 +234,8 @@ SUBROUTINE LidarSim_ParsePrimaryFileInfo( PriPath, InputFile, RootName, FileInfo
       CALL AllocAry( InputFileData%ManualWeighting, InputFileData%ManualWeightingPoints, 'ManualWeighting', TmpErrStat, TmpErrMsg )
             if (Failed()) return;
          ! TABLE read
-      do i=1,InputFileData%NumberOfPoints_Cartesian
-         call ParseAry ( FileInfo, CurLine, 'Coordinates', TmpRe3, 3, TmpErrStat, TmpErrMsg, UnitEcho )
+      do i=1,InputFileData%ManualWeightingPoints
+         call ParseAry ( FileInfo, CurLine, 'Coordinates', TmpRe2, 2, TmpErrStat, TmpErrMsg, UnitEcho )
                if (Failed()) return;
          InputFileData%ManualWeightingDistance(i) = TmpRe2(1)
          InputFileData%ManualWeighting(i) = TmpRe2(2)
