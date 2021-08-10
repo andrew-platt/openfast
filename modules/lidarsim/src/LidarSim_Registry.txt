@@ -10,10 +10,10 @@ typedef  ^                 InitInputType     LOGICAL              UsePrimaryInpu
 typedef  ^                 InitInputtype     FileInfoType         PassedFileData          -     -     -  "Primary input file as FileInfoType (set by driver/glue code when UsePrimaryInputFile==.false.)"   -
 
  ..... LidarSim_InitOutputType data .......................................................................................................
-typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr   :   -   -   "Names of output-to-file channels"   -
-typedef  ^                 InitOutputType    CHARACTER(ChanLen)   WriteOutputUnt   :   -   -   "Units of output-to-file channels"   -
-typedef  ^                 InitOutputType    IntKi                NumWindPoints    -   -   -   "total numer of wind measurement locations (all scanned locations)"   -
-typedef  ^                 InitOutputType    LOGICAL              UniformWindTest  -   -   -   "Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only" -
+typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr          :  -        -  "Names of output-to-file channels"   -
+typedef  ^                 InitOutputType    CHARACTER(ChanLen)   WriteOutputUnt          :  -        -  "Units of output-to-file channels"   -
+typedef  ^                 InitOutputType    ReKi                 UnifWind_Xoffset_URef   -  -        -  "URef for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" m/s
+typedef  ^                 InitOutputType    LOGICAL              UnifWind_Xoffset_URefF  -  .false.  -  "Flag for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" -
 
  ..... LidarSim_OutputType data .......................................................................................................
 typedef  LidarSim/LidarSim OutputType     ReKi     WriteOutput          :   -   -   "Array with values to output to file"   -
@@ -29,7 +29,9 @@ typedef  ^                 ParameterType  ReKi     MeasuringPoints_L            
 typedef  ^                 ParameterType  ReKi     MeasuringPoints_Spherical_L   {:}{:}   -   -   "2D Array of all measuringpoints, first dimension is always 3 (spherical representation)"   "m deg deg"
 typedef  ^                 ParameterType  ReKi     WeightingDistance             {:}      -   -   "Distances to evalute for the weighting"   m
 typedef  ^                 ParameterType  ReKi     Weighting                     {:}      -   -   "weighting of different positions"   -
-typedef  ^                 ParameterType  ReKi     URef                          -        -   -   "Mean u-component wind speed at the reference height" "m/s"
+typedef  ^                 ParameterType  IntKi    nWeightPts                    -        -   -   "number of weighting points at each measurement position"   -
+typedef  ^                 ParameterType  ReKi     UnifWind_Xoffset_URef         -        -   -   "URef for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" m/s
+typedef  ^                 ParameterType  LOGICAL  UnifWind_Xoffset_URefF        -  .false.   -   "Flag for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" -
 typedef  ^                 ParameterType  IntKi    GatesPerBeam                  -        -   -   "Amount of gates per point" -
 typedef  ^                 ParameterType  IntKi    MAXDLLChainOutputs            -        -   -   "Number of entries in the avrSWAP reserved for the DLL chain" -
 typedef  ^                 ParameterType  IntKi    ValidOutputs                  {:}      -   -   "List of valid output channels" -

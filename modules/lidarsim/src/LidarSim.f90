@@ -42,7 +42,7 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     TYPE(LidarSim_OutputType),              INTENT(  OUT)   ::  y                   !< Initial system outputs (outputs are not calculated;
     TYPE(LidarSim_MiscVarType),             INTENT(  OUT)   ::  m                   !< MiscVars
     REAL(DbKi),                             INTENT(INOUT)   ::  Interval            !< timestep OpenFAST is using
-    TYPE(LidarSim_InitOutputType),          INTENT(  OUT)   ::  InitOutData         !< Data to initialize the outputs
+    TYPE(LidarSim_InitOutputType),          INTENT(  OUT)   ::  InitOutData         !< Data to initialize the outputs, and pass to other modules
     INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat             !< Error status of the operation
     CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg              !< Error message if ErrStat /= ErrID_None
 
@@ -91,6 +91,7 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       !  Parse the FileInfo_In structure of data from the inputfile into the InitInp%InputFile structure
    CALL LidarSim_ParsePrimaryFileInfo( PriPath, InitInp%InputInitFile, p%RootName, FileInfo_In, InputFileData, UnEcho, TmpErrStat, TmpErrMsg )
       if (Failed()) return;
+!FIXME:  some sanity checks on the input file would be useful
 
 
    ! Convert angles read in degrees to radians
@@ -101,13 +102,22 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       InputFileData%Azimuth(i)   = InputFileData%Azimuth(i)   * D2R_D
       InputFileData%Elevation(i) = InputFileData%Elevation(i) * D2R_D
    enddo
- 
-    !Transfering InputFileData to the p
-    p%MeasurementMaxSteps   =   CEILING(REAL(NINT(InputFileData%t_measurement_interval*100000))/REAL(NINT(InitInp%DT*100000))) !NINT to remove float precision errors. Back to REAL, otherwise the divion ignores everything behind the decima point. Ceiling to round up to next integer
-    p%URef                  =   InputFileData%URef
-    p%GatesPerBeam          =   InputFileData%GatesPerBeam
+
+   !Transfering InputFileData to the p
+   p%MeasurementMaxSteps   =   CEILING(REAL(NINT(InputFileData%t_measurement_interval*100000))/REAL(NINT(InitInp%DT*100000))) !NINT to remove float precision errors. Back to REAL, otherwise the divion ignores everything behind the decima point. Ceiling to round up to next integer
+   p%GatesPerBeam          =   InputFileData%GatesPerBeam
 !FIXME: can we add some error checking on this to make sure it is a sane value?
-    p%MAXDLLChainOutputs    =   InputFileData%MAXDLLChainOutputs
+   p%MAXDLLChainOutputs    =   InputFileData%MAXDLLChainOutputs
+   ! Are we asking IfW to override the uniform wind and calculate x-offset (violation of Uniform Wind methods -- not very physical)?
+   if (InputFileData%URef > -9999.0_ReKi) then    ! default value set at parse is -9999.0
+      p%UnifWind_Xoffset_URef    = InputFileData%URef
+      p%UnifWind_Xoffset_URefF   = .true.
+   else
+      p%UnifWind_Xoffset_URef    = 0.0_ReKi
+      p%UnifWind_Xoffset_URefF   = .false.
+   endif
+   InitOutData%UnifWind_Xoffset_URef   = p%UnifWind_Xoffset_URef
+   InitOutData%UnifWind_Xoffset_URefF  = p%UnifWind_Xoffset_URefF
 
     ! Create the mesh for the u%LidarMotion mesh
    call Init_LidarMountMesh( InitInp, InputFileData, y, p, TmpErrStat, TmpErrMsg )
@@ -131,21 +141,20 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       if (Failed())  return
        p%WeightingDistance(1) = 0
        p%Weighting(1) = 1
+       p%nWeightPts = 1
    ELSEIF(InputFileData%WeightingType == 1) THEN                                               ! Calls Routine to initialize the weighting with gaussian distribution
        CALL LidarSim_InitializeWeightingGauss(p, InputFileData, TmpErrStat, TmpErrMsg )
-      if (Failed())  return
+       if (Failed())  return
+       p%nWeightPts = size(p%WeightingDistance)
    ELSEIF(InputFileData%WeightingType == 2) THEN
        CALL LidarSim_InitializeWeightingManual(p, InputFileData, TmpErrStat, TmpErrMsg )       ! Calls Routine to initialize with manual weighting settings
-      if (Failed())  return
+       if (Failed())  return
+       p%nWeightPts = size(p%WeightingDistance)
    ENDIF
 
    ! create mesh for the y%LidarMeasPos
    !     This mesh is used for visualization and for retrieving wind velocity information
-   call Init_LidarMeasMesh( y, p, TmpErrStat, TmpErrMsg )
-   if (Failed())  return
-
-   ! create mesh mapping
-   call MeshMapCreate( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
+   call Init_LidarMeasMesh( u, p, y, TmpErrStat, TmpErrMsg )
    if (Failed())  return
 
    ! Initialize all outputs
@@ -246,26 +255,35 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
    !> This creates a mesh with all the measurement points.  This is used in finding the wind velocity measurements
    !! to pass in, and for visualization of the measurement locations.
-   subroutine Init_LidarMeasMesh( y, p, ErrStat2, ErrMsg2 )
+   subroutine Init_LidarMeasMesh( u, p, y, ErrStat2, ErrMsg2 )
+      type(LidarSim_InputType),              intent(inout)  :: u                 !< input
       type(LidarSim_ParameterType),          intent(in   )  :: p                 !< Parameters
       type(LidarSim_OutputType),             intent(inout)  :: y                 !< Initial system outputs (outputs are not calculated;
       integer(IntKi),                        intent(  out)  :: ErrStat2          !< Error status of the operation
       character(ErrMsgLen),                  intent(  out)  :: ErrMsg2           !< Error message if ErrStat /= ErrID_None
 
-      integer(IntKi)                                        :: i                 !< generic counter
-      REAL(ReKi)                                            :: MeasPos_I(3)      !< Measuring Position in global coords
+      integer(IntKi)                                        :: i,j               !< generic counter
+      integer(IntKi)                                        :: iPt               !< index to mesh
+      integer(IntKi)                                        :: nTot              !< total number of measurement points
+      REAL(ReKi)                                            :: MeasPos_I(3)      !< Measuring Position of given weighted point in global coords
+      REAL(ReKi)                                            :: MeasPosCtr_I(3)   !< Central point in the weighted measurement points
+      REAL(ReKi)                                            :: LidarPos_I(3)     !< Lidar Mount point
+      REAL(ReKi)                                            :: UnitVector(3)     !< Vector from Lidar mount to measurement position
       integer(IntKi)                                        :: TmpErrStat
       character(ErrMsgLen)                                  :: TmpErrMsg
       ! Initial error values
       ErrStat     =  ErrID_None
       ErrMsg      = ""
 
-      ! Create the input mesh for the Lidar unit
-      CALL MeshCreate( BlankMesh        = y%LidarMeasMesh               &
-                     ,IOS               = COMPONENT_OUTPUT              &
-                     ,Nnodes            = SIZE(p%MeasuringPoints_L,2)   &     ! total number of measurement points
-                     ,ErrStat           = TmpErrStat                    &
-                     ,ErrMess           = TmpErrMsg                     &
+      ! Total number of measurement points
+      nTot = SIZE(p%MeasuringPoints_L,2)*p%nWeightPts
+
+      ! Create the output mesh for the Lidar measurement locations
+      CALL MeshCreate( BlankMesh        = y%LidarMeasMesh   &
+                     ,IOS               = COMPONENT_OUTPUT  &
+                     ,Nnodes            = nTot              &     ! total number of measurement points
+                     ,ErrStat           = TmpErrStat        &
+                     ,ErrMess           = TmpErrMsg         &
                      ,TranslationDisp   = .TRUE.            &
                      ,Orientation       = .false.           &
                      ,TranslationVel    = .false.           &
@@ -275,21 +293,37 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
          CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
          if (ErrStat2 >= AbortErrLev) return
 
-      do i=1,y%LidarMeasMesh%Nnodes
-         ! Get position in inertial coordinates:
-         MeasPos_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,i))
+      ! Lidar position
+      LidarPos_I =  u%LidarMesh%Position(1:3,1) + u%LidarMesh%TranslationDisp(1:3,1)
 
-         ! Create the node on the mesh
-         CALL MeshPositionNode ( y%LidarMeasMesh,i, MeasPos_I, TmpErrStat, TmpErrMsg )
-            CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+      ! Loop over all beams
+      do i=1,size(p%MeasuringPoints_L,2)
 
-         ! Create the mesh element
-         CALL MeshConstructElement (  y%LidarMeasMesh     &
-                                     , ELEMENT_POINT      &
-                                     , TmpErrStat         &
-                                     , TmpErrMsg          &
-                                     , i                  )
-            CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         ! Get central position in inertial coordinates:
+         MeasPosCtr_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,i))
+
+         ! Line of Sight unit vector
+         UnitVector    =   MeasPosCtr_I - LidarPos_I          ! Calculation of the Line of Sight Vector
+         UnitVector    =   UnitVector/NORM2(UnitVector)       ! =>Magnitude = 1
+
+         ! loop over weighted measure points along beam about central point
+         do j=1,p%nWeightPts
+            iPt = (i-1)*p%nWeightPts+j
+
+            MeasPos_I = MeasPosCtr_I + p%WeightingDistance(j) * UnitVector
+
+            ! Create the node on the mesh
+            CALL MeshPositionNode ( y%LidarMeasMesh,iPt, MeasPos_I, TmpErrStat, TmpErrMsg )
+               CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+
+            ! Create the mesh element
+            CALL MeshConstructElement (  y%LidarMeasMesh     &
+                                        , ELEMENT_POINT      &
+                                        , TmpErrStat         &
+                                        , TmpErrMsg          &
+                                        , iPt                )
+               CALL SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         enddo
       enddo
 
       CALL MeshCommit ( y%LidarMeasMesh     &
@@ -299,6 +333,16 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
       y%LidarMeasMesh%TranslationDisp = 0.0_R8Ki
       y%LidarMeasMesh%RemapFlag  = .false.
+
+      !--------------------
+      ! create mesh mapping
+      call MeshMapCreate( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
+         call SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         if (ErrStat2 >= AbortErrLev) return
+      call AllocAry( u%WindVelocity, 3, y%LidarMeasMesh%Nnodes, 'WindVelocity', TmpErrStat, TmpErrMsg )
+         call SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
+         if (ErrStat2 >= AbortErrLev) return
+
    end subroutine Init_LidarMeasMesh
 
 END SUBROUTINE LidarSim_Init
@@ -338,15 +382,19 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     TYPE(InflowWind_OutputType)                                     ::  OutputForCalculation        !datafield in which the calculated speed is stored
     REAL(ReKi)                                                      ::  UnitVector(3)               !Line of Sight Unit Vector
     REAL(ReKi)                                                      ::  MeasuringPosition_I(3)      !Transformed Measuring Position
+    REAL(ReKi)                                                      ::  MeasuringPositionMesh_I(3)  !Transformed Measuring Position
     REAL(ReKi)                                                      ::  LidarPosition_I(3)          !Transformed Lidar Position
     REAL(ReKi)                                                      ::  Vlos                        !Line of sight speed
-    INTEGER(IntKi)                                                  ::  LoopGatesPerBeam            !Counter to loop through all gate points of a line
+    REAL(ReKi)                                                      ::  WeightPos(3,p%nWeightPts)   ! Inertial position of weighted measure point
+    REAL(ReKi)                                                      ::  WindVel(3,p%nWeightPts)     ! Velocity of wind at weighted measure point
+    INTEGER(IntKi)                                                  ::  LoopGatesPerBeam            ! Counter to loop through all gate points of a line
     INTEGER(IntKi)                                                  ::  LoopCounter
+    integer(IntKi)                                                  ::  StrtPt                      ! Starting index for set of weighted beam locations in mesh
 
     ! Temporary variables for error handling
-    INTEGER(IntKi)                                                  ::  TmpErrStat        
+    INTEGER(IntKi)                                                  ::  TmpErrStat
     CHARACTER(ErrMsgLen)                                            ::  TmpErrMsg
-    
+
     !Initialize error values
     ErrStat        =  ErrID_None
     ErrMsg         =  ""
@@ -361,21 +409,28 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
 
         CALL LidarSim_CalculateIMU(p, y, u)
         DO LoopGatesPerBeam = 0,p%GatesPerBeam-1
+            StrtPt = p%nWeightPts * (m%LastMeasuringPoint-1 + LoopGatesPerBeam) + 1
             ! lidar measurement position in inertial coordinates
-            MeasuringPosition_I = y%LidarMeasMesh%Position(:,m%LastMeasuringPoint+LoopGatesPerBeam) + y%LidarMeasMesh%TranslationDisp(:,m%LastMeasuringPoint+LoopGatesPerBeam)
+            MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
+            WeightPos(1:3,1:p%nWeightPts) = y%LidarMeasMesh%Position(       :,StrtPt:StrtPt+p%nWeightPts-1) &
+                                          + y%LidarMeasMesh%TranslationDisp(:,StrtPt:StrtPt+p%nWeightPts-1)
+            WindVel(1:3,1:p%nWeightPts)   = u%WindVelocity(                 :,StrtPt:StrtPt+p%nWeightPts-1)
 
             !Line of Sight
-            UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector          
+            UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector
             UnitVector    =   UnitVector/NORM2(UnitVector)                      !=>Magnitude = 1
 
             ! Calculation of the wind speed at the calculated position
-            CALL LidarSim_CalculateVlos( p, UnitVector, Vlos, MeasuringPosition_I, LidarPosition_I, Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, TmpErrStat, TmpErrMsg) !Calculation of the line of sight wind speed
-            CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)    
+            CALL LidarSim_CalculateVlos( p, UnitVector, Vlos, MeasuringPosition_I, LidarPosition_I, &
+                              WeightPos, WindVel, &
+                              Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, &
+                              TmpErrStat, TmpErrMsg) !Calculation of the line of sight wind speed
+            CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
             CALL LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)    !Set all outputs to the output variable
-        ENDDO                
-        
+        ENDDO
+
         !Choosing which measuring point has to be calculated
-        IF(m%LastMeasuringPoint+p%GatesPerBeam > SIZE(p%MeasuringPoints_L,2))THEN                      
+        IF(m%LastMeasuringPoint+p%GatesPerBeam > SIZE(p%MeasuringPoints_L,2)) THEN
             m%LastMeasuringPoint = 1        ! already reached the last point before ? => start over from the beginning
             m%NextBeamID = 0
         ELSE

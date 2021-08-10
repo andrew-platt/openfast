@@ -404,7 +404,7 @@ END SUBROUTINE ED_InputSolve
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine determines the points in space where InflowWind needs to compute wind speeds.
 !FIXME: add LidarSim points
-SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, OtherSt_AD, y_ED, ErrStat, ErrMsg )
+SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, OtherSt_AD, y_ED, y_LidSim, ErrStat, ErrMsg )
 
 !FIXME: add LidarSim wind points here:
    TYPE(InflowWind_InputType),     INTENT(INOUT)   :: u_IfW       !< The inputs to InflowWind
@@ -413,6 +413,7 @@ SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, OtherSt_A
    TYPE(AD_InputType),             INTENT(IN)      :: u_AD        !< The input meshes (already calculated) from AeroDyn
    TYPE(AD_OtherStateType),        INTENT(IN)      :: OtherSt_AD  !< The wake points from AeroDyn are in here (Free Vortex Wake)
    TYPE(ED_OutputType),            INTENT(IN)      :: y_ED        !< The outputs of the structural dynamics module (for IfW Lidar)
+   TYPE(LidarSim_OutputType),      INTENT(IN)      :: y_LidSim    !< The outputs of the LidarSim module
    TYPE(FAST_ParameterType),       INTENT(IN   )   :: p_FAST      !< FAST parameter data 
    TYPE(FAST_MiscVarType),         INTENT(IN   )   :: m_FAST      !< misc FAST data, including inputs from external codes like Simulink      
    
@@ -487,8 +488,18 @@ SUBROUTINE IfW_InputSolve( p_FAST, m_FAST, u_IfW, p_IfW, u_AD14, u_AD, OtherSt_A
       end if
       
    END IF
-   
-               
+
+   ! LidarSim module
+   if (p_FAST%CompLidar == MODULE_LidSim) then
+      if (y_LidSim%LidarMeasMesh%Committed) then
+         do j=1,y_LidSim%LidarMeasMesh%Nnodes
+            Node = Node + 1
+            u_IfW%PositionXYZ(:,Node) = y_LidSim%LidarMeasMesh%TranslationDisp(:,j) + y_LidSim%LidarMeasMesh%Position(:,j)
+         enddo
+      endif
+   endif
+
+
    CALL IfW_SetExternalInputs( p_IfW, m_FAST, y_ED, u_IfW )
 
 
@@ -1491,6 +1502,7 @@ SUBROUTINE LidarSim_InputSolve( p_FAST, u_LidSim, y_IfW, y_ED, y_SD, y_SrvD, Mes
    CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg                   !< Error message
 
       ! local variables
+   integer(IntKi)                             :: j, node
    INTEGER(IntKi)                             :: ErrStat2                     ! temporary Error status of the operation
    CHARACTER(ErrMsgLen)                       :: ErrMsg2                      ! temporary Error message if ErrStat /= ErrID_None
    CHARACTER(*), PARAMETER                    :: RoutineName = 'LidarSim_InputSolve'
@@ -1517,7 +1529,14 @@ SUBROUTINE LidarSim_InputSolve( p_FAST, u_LidSim, y_IfW, y_ED, y_SD, y_SrvD, Mes
       ENDIF
    END IF
 
-!FIXME: transfer IfW points here
+   ! Wind from IfW -- these are the last set of velocity measurements from IfW
+   if (p_FAST%CompLidar == MODULE_LidSim) then
+      Node = size(y_IfW%VelocityUVW,2) - size(u_LidSim%WindVelocity,2)
+      do j=1,size(u_LidSim%WindVelocity,2)
+         Node = Node + 1      ! Started at location before, so incriment first
+         u_LidSim%WindVelocity(:,j) = y_IfW%VelocityUVW(:,node)
+      enddo
+   endif
 
 !FIXME: send controls from SrvD here
 
@@ -5223,7 +5242,7 @@ SUBROUTINE CalcOutputs_And_SolveForInputs( n_t_global, this_time, this_state, ca
 
 !FIXME: add the LidarSim points here
    IF ( p_FAST%CompInflow == Module_IfW ) THEN
-      CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), AD%OtherSt(this_state), ED%y, ErrStat2, ErrMsg2 )
+      CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), AD%OtherSt(this_state), ED%y, LidSim%y, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
    ELSE IF ( p_FAST%CompInflow == Module_OpFM ) THEN
    ! OpenFOAM is the driver and it sets these inputs outside of this solve; the OpenFOAM inputs and outputs thus don't change 
@@ -5583,7 +5602,7 @@ SUBROUTINE SolveOption2b_Inp2IfW(this_time, this_state, p_FAST, m_FAST, ED, BD, 
    IF (p_FAST%CompInflow == Module_IfW) THEN
       ! must be done after ED_CalcOutput and before AD_CalcOutput and SrvD
 !FIXME: add LidarSim wind points here:
-      CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), AD%OtherSt(this_state), ED%y, ErrStat2, ErrMsg2 ) ! do we want this to be curr states
+      CALL IfW_InputSolve( p_FAST, m_FAST, IfW%Input(1), IfW%p, AD14%Input(1), AD%Input(1), AD%OtherSt(this_state), ED%y, LidSim%y, ErrStat2, ErrMsg2 ) ! do we want this to be curr states
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    !ELSE IF ( p_FAST%CompInflow == Module_OpFM ) THEN
    ! ! OpenFOAM is the driver and it computes outputs outside of this solve; the OpenFOAM inputs and outputs thus don't change 
@@ -5921,7 +5940,8 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, m_FAST, ED, BD, Sr
    END IF
 
 
-   ! LidarSim: get predicted states -- NOTE: LidarSim does not have states to update.
+   ! LidarSim: get predicted states
+   !  NOTE: LidarSim does not have states to update.  If any are added, move this block after the SolveOption2c_Inp2AD_SrvD_LidSim call
    IF ( p_FAST%CompLidar == Module_LidSim ) THEN
       CALL LidarSim_CopyContState   (LidSim%x( STATE_CURR), LidSim%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )

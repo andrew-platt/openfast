@@ -523,6 +523,54 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
 
 
    ! ........................
+   ! initialize LidarSim
+   ! ........................
+   ALLOCATE( LidSim%Input( p_FAST%InterpOrder+1 ), LidSim%InputTimes( p_FAST%InterpOrder+1 ), STAT = ErrStat2 )
+      IF (ErrStat2 /= 0) THEN
+         CALL SetErrStat(ErrID_Fatal,"Error allocating LidSim%Input and LidSim%InputTimes.",ErrStat,ErrMsg,RoutineName)
+         CALL Cleanup()
+         RETURN
+      END IF
+
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      p_FAST%ModuleInitialized(Module_LidSim) = .TRUE.
+      Init%InData_LidSim%RootName  =   TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_LidSim))
+      Init%InData_LidSim%InputInitFile =   p_FAST%LidarFile
+      Init%InData_LidSim%DT            =   p_FAST%DT
+      ! Reference location to pass in
+      if (    p_FAST%LidarMountLocation == LidarMount_Nacelle ) then
+         Init%InData_LidSim%LidarRefPosition(1:3)        = ED%Input(1)%NacelleLoads%Position(1:3,1)
+         Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%Input(1)%NacelleLoads%RefOrientation(1:3,1:3,1)  ! R8Ki
+      elseif( p_FAST%LidarMountLocation == LidarMount_Hub ) then          ! hub mesh from ED
+         Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%HubPtMotion%Position(:,1)
+         Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%HubPtMotion%RefOrientation(:,:,1)
+      elseif( p_FAST%LidarMountLocation == LidarMount_Ground ) then       ! use tower base reference
+         Init%InData_LidSim%LidarRefPosition(1:3)        = Init%OutData_ED%TwrBasePos
+         Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = Init%OutData_ED%TwrBaseOrient                      ! R8Ki
+      elseif( p_FAST%LidarMountLocation == LidarMount_Platform ) then     ! for floating, the platform ref point is used for ExtPtfm, SD, and ED (monopile)
+         Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%PlatformPtMesh%Position(1:3,1)
+         Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%PlatformPtMesh%Orientation(1:3,1:3,1)  ! R8Ki
+      endif
+      CALL LidarSim_Init( Init%InData_LidSim, LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), &
+                 LidSim%OtherSt(STATE_CURR), LidSim%y, LidSim%m, p_FAST%dt_module( MODULE_LidSim ), Init%OutData_LidSim, ErrStat2, ErrMsg2 )
+      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+      IF (ErrStat >= AbortErrLev) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+      IF ( p_FAST%CompServo == Module_SrvD ) THEN
+         Init%InData_SrvD%GatesPerBeam = LidSim%p%GatesPerBeam
+         Init%InData_SrvD%MAXDLLChainOutputs = LidSim%p%MAXDLLChainOutputs
+      END IF
+   ELSE
+      IF ( p_FAST%CompServo == Module_SrvD ) THEN
+         Init%InData_SrvD%GatesPerBeam = 1
+         Init%InData_SrvD%MAXDLLChainOutputs = 100
+      END IF
+   END IF
+
+
+   ! ........................
    ! initialize InflowWind
    ! ........................
    ALLOCATE( IfW%Input( p_FAST%InterpOrder+1 ), IfW%InputTimes( p_FAST%InterpOrder+1 ), STAT = ErrStat2 )
@@ -559,8 +607,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          if (allocated(AD%OtherSt(STATE_CURR)%WakeLocationPoints)) then
             Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + size(AD%OtherSt(STATE_CURR)%WakeLocationPoints,DIM=2)
          end if
-         
       END IF
+      ! the LidarSim_InputSolve routine expects lidar data to be the very last set of points.  Update that routine if anything changes here.
+      IF ( p_FAST%CompLidar == Module_LidSim ) Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + LidSim%y%LidarMeasMesh%Nnodes
 
       ! lidar
       Init%InData_IfW%lidar%Tmax                   = p_FAST%TMax
@@ -687,63 +736,8 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
          END IF
       END IF
    END IF
-   
-   
-!FIXME: move this to before InflowWind init.  Need size of arrays...
-   ! ........................
-   ! initialize LidarSim
-   ! ........................
-   ALLOCATE( LidSim%Input( p_FAST%InterpOrder+1 ), LidSim%InputTimes( p_FAST%InterpOrder+1 ), STAT = ErrStat2 )
-      IF (ErrStat2 /= 0) THEN
-         CALL SetErrStat(ErrID_Fatal,"Error allocating LidSim%Input and LidSim%InputTimes.",ErrStat,ErrMsg,RoutineName)
-         CALL Cleanup()
-         RETURN
-      END IF
 
-   IF ( p_FAST%CompLidar == Module_LidSim ) THEN 
-      IF ( p_FAST%CompInflow == Module_IfW ) THEN
-!FIXME: IfW should not be here!!!!
-         p_FAST%ModuleInitialized(Module_LidSim) = .TRUE.
-         Init%InData_LidSim%RootName  =   TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_LidSim))
-         Init%InData_LidSim%InputInitFile =   p_FAST%LidarFile
-         Init%InData_LidSim%DT            =   p_FAST%DT
-         ! Reference location to pass in
-         if (    p_FAST%LidarMountLocation == LidarMount_Nacelle ) then
-            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%Input(1)%NacelleLoads%Position(1:3,1)
-            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%Input(1)%NacelleLoads%RefOrientation(1:3,1:3,1)  ! R8Ki
-         elseif( p_FAST%LidarMountLocation == LidarMount_Hub ) then          ! hub mesh from ED
-            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%HubPtMotion%Position(:,1)
-            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%HubPtMotion%RefOrientation(:,:,1)
-         elseif( p_FAST%LidarMountLocation == LidarMount_Ground ) then       ! use tower base reference
-            Init%InData_LidSim%LidarRefPosition(1:3)        = Init%OutData_ED%TwrBasePos
-            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = Init%OutData_ED%TwrBaseOrient                      ! R8Ki
-         elseif( p_FAST%LidarMountLocation == LidarMount_Platform ) then     ! for floating, the platform ref point is used for ExtPtfm, SD, and ED (monopile)
-            Init%InData_LidSim%LidarRefPosition(1:3)        = ED%y%PlatformPtMesh%Position(1:3,1)
-            Init%InData_LidSim%LidarRefOrientation(1:3,1:3) = ED%y%PlatformPtMesh%Orientation(1:3,1:3,1)  ! R8Ki
-         endif
-         CALL LidarSim_Init( Init%InData_LidSim, LidSim%Input(1), LidSim%p, LidSim%x(STATE_CURR), LidSim%xd(STATE_CURR), LidSim%z(STATE_CURR), &
-                    LidSim%OtherSt(STATE_CURR), LidSim%y, LidSim%m, p_FAST%dt_module( MODULE_LidSim ), Init%OutData_LidSim, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-      ELSE
-         CALL SetErrStat(ErrID_Severe,"LidarSim dosen't work without InflowWind",ErrStat,ErrMsg,RoutineName)
-         p_FAST%CompLidar = Module_None
-      END IF
-      IF (ErrStat >= AbortErrLev) THEN
-         CALL Cleanup()
-         RETURN
-      END IF
-      IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         Init%InData_SrvD%GatesPerBeam = LidSim%p%GatesPerBeam
-         Init%InData_SrvD%MAXDLLChainOutputs = LidSim%p%MAXDLLChainOutputs
-      END IF
-   ELSE
-      IF ( p_FAST%CompServo == Module_SrvD ) THEN
-         Init%InData_SrvD%GatesPerBeam = 1
-         Init%InData_SrvD%MAXDLLChainOutputs = 100
-      END IF
-   END IF 
-   
-   
+
    ! ........................
    ! initialize ServoDyn
    ! ........................
@@ -1781,6 +1775,7 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
 
    IF (p%CompLidar == Module_LidSim) then
       if (p%LidarMountLocation == LidarMount_Platform .and. p%CompHydro /= Module_HD) CALL SetErrStat( ErrID_Fatal, 'Lidar cannot be mounted on the platform without HydroDyn.', ErrStat, ErrMsg, RoutineName )
+      IF ( p%CompInflow /= Module_IfW ) CALL SetErrStat(ErrID_Fatal,"LidarSim requires InflowWind at present.",ErrStat,ErrMsg,RoutineName)
    END IF
 
 !   IF ( p%InterpOrder < 0 .OR. p%InterpOrder > 2 ) THEN
@@ -1852,6 +1847,7 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
       if (p%CompSub /= MODULE_None .and. p%CompSub /= MODULE_SD )     call SetErrStat(ErrID_Fatal,'Linearization is not implemented for the ExtPtfm_MCKF substructure module.',ErrStat, ErrMsg, RoutineName)
       if (p%CompMooring /= MODULE_None .and. p%CompMooring /= MODULE_MAP) call SetErrStat(ErrID_Fatal,'Linearization is not implemented for the FEAMooring or MoorDyn mooring modules.',ErrStat, ErrMsg, RoutineName)
       if (p%CompIce /= MODULE_None) call SetErrStat(ErrID_Fatal,'Linearization is not implemented for any of the ice loading modules.',ErrStat, ErrMsg, RoutineName)
+      if (p%CompLidar /= MODULE_None) call SetErrStat(ErrID_Fatal,'Linearization is not implemented for the LidarSim module.',ErrStat, ErrMsg, RoutineName)
 
    end if
 

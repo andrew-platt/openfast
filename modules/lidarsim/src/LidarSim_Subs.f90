@@ -119,7 +119,7 @@ SUBROUTINE LidarSim_ParsePrimaryFileInfo( PriPath, InputFile, RootName, FileInfo
          if (Failed()) return
    call ParseVar( FileInfo, CurLine, 'YawAngle', InputFileData%YawAngle, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
-   call ParseVar( FileInfo, CurLine, 'URef', InputFileData%URef, TmpErrStat, TmpErrMsg, UnitEcho)
+   call ParseVarWDefault( FileInfo, CurLine, 'URef', InputFileData%URef, -9999.0_ReKi, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
    call ParseVar( FileInfo, CurLine, 'GatesPerBeam', InputFileData%GatesPerBeam, TmpErrStat, TmpErrMsg, UnitEcho)
          if (Failed()) return
@@ -299,6 +299,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     ErrStat        =  0
     ErrMsg         =  ""
     
+!FIXME: MeasuringPoints_L is used assuming GatesPerBeam is used.  There are no checks in the Cartesian to verify this is true.  So array bounds is potentially overstepped
     CALL AllocAry( p%MeasuringPoints_L, 3, SIZE(InputFileData%X_Cartesian_L), 'MeasuringPoints_L', TmpErrStat, TmpErrMsg )     !Allocate the array size for n=CounterChannelNumbers measuringpositions
     CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
     CALL AllocAry( p%MeasuringPoints_Spherical_L, 3,  SIZE(InputFileData%X_Cartesian_L), 'MeasuringPoints_Spherical_L', TmpErrStat, TmpErrMsg )
@@ -499,7 +500,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     
 !#########################################################################################################################################################################   
     
-    SUBROUTINE LidarSim_CalculateVlos(p, UnitVector_I, Vlos, MeasuringPosition_I, LidarPosition_I,&
+    SUBROUTINE LidarSim_CalculateVlos(p, UnitVector_I, Vlos, MeasuringPosition_I, LidarPosition_I, WeightPos, WindVel, &
     Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, ErrStat, ErrMsg)
     
     IMPLICIT                                NONE
@@ -509,6 +510,8 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     REAL(ReKi),                             INTENT(IN   )   ::  UnitVector_I(3)             !Line of Sight Unit Vector
     REAL(ReKi),                             INTENT(INOUT)   ::  MeasuringPosition_I(3)      !Position of the measuring point
     REAL(ReKi),                             INTENT(IN   )   ::  LidarPosition_I(3)          !Position of the measuring point
+    REAL(ReKi),                             INTENT(IN   )   ::  WeightPos(:,:)              ! Position of weighted point (from mesh)
+    REAL(ReKi),                             INTENT(IN   )   ::  WindVel(:,:)                ! Wind velocity array from IfW at weighted point
     REAL(ReKi),                             INTENT(  OUT)   ::  Vlos                        !Calculated speed in los direction
     REAL(DbKi),                             INTENT(IN   )   ::  Time                        !< Current simulation time in seconds
 
@@ -553,7 +556,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
             ! position of the weighted measuring point
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
-            CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%Uref), InputForCalculation, IfW_p, &
+            CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%UnifWind_Xoffset_URef), InputForCalculation, IfW_p, &
                                     IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, &
                                     IfW_m, .FALSE., ErrStat2, ErrMsg2 )
             CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -702,7 +705,7 @@ SUBROUTINE LidarSim_InitializeOutputs(y,p, InitOutData, InputFileData, ErrStat, 
     
     TYPE(LidarSim_OutputType),             INTENT(INOUT)   ::  y                   ! lidar outputs (IN since contains mesh info already)
     TYPE(LidarSim_ParameterType),          INTENT(INOUT)   ::  p                   ! Parameter data for the lidar module
-    TYPE(LidarSim_InitOutputType),         INTENT(  OUT)   ::  InitOutData
+    TYPE(LidarSim_InitOutputType),         INTENT(INOUT)   ::  InitOutData          ! In since some data previously stored
     TYPE(LidarSim_InputFile),              INTENT(IN   )   ::  InputFileData
     INTEGER(IntKi),                        INTENT(  OUT)   ::  ErrStat              !< Temporary error status
     CHARACTER(ErrMsgLen),                  INTENT(  OUT)   ::  ErrMsg               !< temporary error message

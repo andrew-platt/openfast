@@ -48,8 +48,8 @@ IMPLICIT NONE
   TYPE, PUBLIC :: LidarSim_InitOutputType
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputHdr      !< Names of output-to-file channels [-]
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputUnt      !< Units of output-to-file channels [-]
-    INTEGER(IntKi)  :: NumWindPoints      !< total numer of wind measurement locations (all scanned locations) [-]
-    LOGICAL  :: UniformWindTest      !< Show wind steps upstream in uniform wind (violates UniformWind methodology). For testing purposes only [-]
+    REAL(ReKi)  :: UnifWind_Xoffset_URef      !< URef for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only [m/s]
+    LOGICAL  :: UnifWind_Xoffset_URefF = .false.      !< Flag for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only [-]
   END TYPE LidarSim_InitOutputType
 ! =======================
 ! =========  LidarSim_OutputType  =======
@@ -69,7 +69,9 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MeasuringPoints_Spherical_L      !< 2D Array of all measuringpoints, first dimension is always 3 (spherical representation) [m deg deg]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WeightingDistance      !< Distances to evalute for the weighting [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Weighting      !< weighting of different positions [-]
-    REAL(ReKi)  :: URef      !< Mean u-component wind speed at the reference height [m/s]
+    INTEGER(IntKi)  :: nWeightPts      !< number of weighting points at each measurement position [-]
+    REAL(ReKi)  :: UnifWind_Xoffset_URef      !< URef for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only [m/s]
+    LOGICAL  :: UnifWind_Xoffset_URefF = .false.      !< Flag for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only [-]
     INTEGER(IntKi)  :: GatesPerBeam      !< Amount of gates per point [-]
     INTEGER(IntKi)  :: MAXDLLChainOutputs      !< Number of entries in the avrSWAP reserved for the DLL chain [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: ValidOutputs      !< List of valid output channels [-]
@@ -459,8 +461,8 @@ IF (ALLOCATED(SrcInitOutputData%WriteOutputUnt)) THEN
   END IF
     DstInitOutputData%WriteOutputUnt = SrcInitOutputData%WriteOutputUnt
 ENDIF
-    DstInitOutputData%NumWindPoints = SrcInitOutputData%NumWindPoints
-    DstInitOutputData%UniformWindTest = SrcInitOutputData%UniformWindTest
+    DstInitOutputData%UnifWind_Xoffset_URef = SrcInitOutputData%UnifWind_Xoffset_URef
+    DstInitOutputData%UnifWind_Xoffset_URefF = SrcInitOutputData%UnifWind_Xoffset_URefF
  END SUBROUTINE LidarSim_CopyInitOutput
 
  SUBROUTINE LidarSim_DestroyInitOutput( InitOutputData, ErrStat, ErrMsg )
@@ -525,8 +527,8 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! WriteOutputUnt upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%WriteOutputUnt)*LEN(InData%WriteOutputUnt)  ! WriteOutputUnt
   END IF
-      Int_BufSz  = Int_BufSz  + 1  ! NumWindPoints
-      Int_BufSz  = Int_BufSz  + 1  ! UniformWindTest
+      Re_BufSz   = Re_BufSz   + 1  ! UnifWind_Xoffset_URef
+      Int_BufSz  = Int_BufSz  + 1  ! UnifWind_Xoffset_URefF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -588,9 +590,9 @@ ENDIF
         END DO ! I
       END DO
   END IF
-    IntKiBuf(Int_Xferred) = InData%NumWindPoints
-    Int_Xferred = Int_Xferred + 1
-    IntKiBuf(Int_Xferred) = TRANSFER(InData%UniformWindTest, IntKiBuf(1))
+    ReKiBuf(Re_Xferred) = InData%UnifWind_Xoffset_URef
+    Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%UnifWind_Xoffset_URefF, IntKiBuf(1))
     Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_PackInitOutput
 
@@ -661,9 +663,9 @@ ENDIF
         END DO ! I
       END DO
   END IF
-    OutData%NumWindPoints = IntKiBuf(Int_Xferred)
-    Int_Xferred = Int_Xferred + 1
-    OutData%UniformWindTest = TRANSFER(IntKiBuf(Int_Xferred), OutData%UniformWindTest)
+    OutData%UnifWind_Xoffset_URef = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
+    OutData%UnifWind_Xoffset_URefF = TRANSFER(IntKiBuf(Int_Xferred), OutData%UnifWind_Xoffset_URefF)
     Int_Xferred = Int_Xferred + 1
  END SUBROUTINE LidarSim_UnPackInitOutput
 
@@ -1160,7 +1162,9 @@ IF (ALLOCATED(SrcParamData%Weighting)) THEN
   END IF
     DstParamData%Weighting = SrcParamData%Weighting
 ENDIF
-    DstParamData%URef = SrcParamData%URef
+    DstParamData%nWeightPts = SrcParamData%nWeightPts
+    DstParamData%UnifWind_Xoffset_URef = SrcParamData%UnifWind_Xoffset_URef
+    DstParamData%UnifWind_Xoffset_URefF = SrcParamData%UnifWind_Xoffset_URefF
     DstParamData%GatesPerBeam = SrcParamData%GatesPerBeam
     DstParamData%MAXDLLChainOutputs = SrcParamData%MAXDLLChainOutputs
 IF (ALLOCATED(SrcParamData%ValidOutputs)) THEN
@@ -1262,7 +1266,9 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*1  ! Weighting upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%Weighting)  ! Weighting
   END IF
-      Re_BufSz   = Re_BufSz   + 1  ! URef
+      Int_BufSz  = Int_BufSz  + 1  ! nWeightPts
+      Re_BufSz   = Re_BufSz   + 1  ! UnifWind_Xoffset_URef
+      Int_BufSz  = Int_BufSz  + 1  ! UnifWind_Xoffset_URefF
       Int_BufSz  = Int_BufSz  + 1  ! GatesPerBeam
       Int_BufSz  = Int_BufSz  + 1  ! MAXDLLChainOutputs
   Int_BufSz   = Int_BufSz   + 1     ! ValidOutputs allocated yes/no
@@ -1375,8 +1381,12 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
-    ReKiBuf(Re_Xferred) = InData%URef
+    IntKiBuf(Int_Xferred) = InData%nWeightPts
+    Int_Xferred = Int_Xferred + 1
+    ReKiBuf(Re_Xferred) = InData%UnifWind_Xoffset_URef
     Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%UnifWind_Xoffset_URefF, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%GatesPerBeam
     Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%MAXDLLChainOutputs
@@ -1518,8 +1528,12 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
-    OutData%URef = ReKiBuf(Re_Xferred)
+    OutData%nWeightPts = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%UnifWind_Xoffset_URef = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
+    OutData%UnifWind_Xoffset_URefF = TRANSFER(IntKiBuf(Int_Xferred), OutData%UnifWind_Xoffset_URefF)
+    Int_Xferred = Int_Xferred + 1
     OutData%GatesPerBeam = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     OutData%MAXDLLChainOutputs = IntKiBuf(Int_Xferred)
