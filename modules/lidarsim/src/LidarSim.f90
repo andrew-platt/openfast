@@ -3,15 +3,10 @@ MODULE LidarSim
    USE LidarSim_Types
    USE LidarSim_Subs
    USE NWTC_Library
-!FIXME: remove IfW completely from this module.
-   USE InflowWind
-   USE InflowWind_Subs
-   USE InflowWind_Types
 
    IMPLICIT NONE
    PRIVATE
 
-   TYPE(ProgDesc), PARAMETER   ::  IfW_Ver = ProgDesc( 'LidarSim', 'v0.20', '12-December-2019' )
    PUBLIC                      ::  LidarSim_Init
    PUBLIC                      ::  LidarSim_CalcOutput
    PUBLIC                      ::  LidarSim_End
@@ -349,9 +344,7 @@ END SUBROUTINE LidarSim_Init
 
 !#########################################################################################################################################################################
 
-SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
-    IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates,  IfW_m,&
-    ErrStat, ErrMsg )
+SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
     IMPLICIT                                    NONE
     CHARACTER(*),                               PARAMETER           ::  RoutineName="LidarSim_CalcOutput"
 
@@ -367,19 +360,7 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
     INTEGER(IntKi),                             INTENT(  OUT)       ::  ErrStat                     !< Error status of the operation
     CHARACTER(*),                               INTENT(  OUT)       ::  ErrMsg                      !< Error message if ErrStat /= ErrID_None
 
-!FIXME: Remove IfW completely from here
-    !Data for CalcOutput of IfW_Subs
-    TYPE(InflowWind_ParameterType),             INTENT(IN   )       ::  IfW_p                       !< Parameters
-    TYPE(InflowWind_ContinuousStateType),       INTENT(IN   )       ::  IfW_ContStates              !< Continuous states at Time
-    TYPE(InflowWind_DiscreteStateType),         INTENT(IN   )       ::  IfW_DiscStates              !< Discrete states at Time
-    TYPE(InflowWind_ConstraintStateType),       INTENT(IN   )       ::  IfW_ConstrStates            !< Constraint states at Time
-    TYPE(InflowWind_OtherStateType),            INTENT(IN   )       ::  IfW_OtherStates             !< Other/optimization states at Time
-    TYPE(InflowWind_MiscVarType),               INTENT(INOUT)       ::  IfW_m                       !< Misc variables for optimization (not copied in glue code)    
-
     !Local Variables
-!FIXME: remove IfW completely from here
-    TYPE(InflowWind_InputType)                                      ::  InputForCalculation         !Data Field needed for the calculation of the windspeed
-    TYPE(InflowWind_OutputType)                                     ::  OutputForCalculation        !datafield in which the calculated speed is stored
     REAL(ReKi)                                                      ::  UnitVector(3)               !Line of Sight Unit Vector
     REAL(ReKi)                                                      ::  MeasuringPosition_I(3)      !Transformed Measuring Position
     REAL(ReKi)                                                      ::  MeasuringPositionMesh_I(3)  !Transformed Measuring Position
@@ -411,6 +392,7 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
         DO LoopGatesPerBeam = 0,p%GatesPerBeam-1
             StrtPt = p%nWeightPts * (m%LastMeasuringPoint-1 + LoopGatesPerBeam) + 1
             ! lidar measurement position in inertial coordinates
+!FIXME: can use the first weighted point for the unit vector
             MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
             WeightPos(1:3,1:p%nWeightPts) = y%LidarMeasMesh%Position(       :,StrtPt:StrtPt+p%nWeightPts-1) &
                                           + y%LidarMeasMesh%TranslationDisp(:,StrtPt:StrtPt+p%nWeightPts-1)
@@ -421,10 +403,7 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m,&
             UnitVector    =   UnitVector/NORM2(UnitVector)                      !=>Magnitude = 1
 
             ! Calculation of the wind speed at the calculated position
-            CALL LidarSim_CalculateVlos( p, UnitVector, Vlos, MeasuringPosition_I, LidarPosition_I, &
-                              WeightPos, WindVel, &
-                              Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, &
-                              TmpErrStat, TmpErrMsg) !Calculation of the line of sight wind speed
+            CALL LidarSim_CalculateVlos( p, UnitVector, Vlos, WeightPos, WindVel, TmpErrStat, TmpErrMsg) !Calculation of the line of sight wind speed
             CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
             CALL LidarSim_SetOutputs(y,p,m,Vlos,UnitVector,LoopGatesPerBeam,Time)    !Set all outputs to the output variable
         ENDDO

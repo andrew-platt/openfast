@@ -25,8 +25,7 @@ set(LIDSIM_SOURCES
 )
 
 add_library(lidsimlib ${LIDSIM_SOURCES})
-#FIXME: remove ifwlib -- this breaks the framework
-target_link_libraries(lidsimlib ifwlib nwtclibs)
+target_link_libraries(lidsimlib nwtclibs)
 
 
 install(TARGETS lidsimlib

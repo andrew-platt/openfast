@@ -2,8 +2,6 @@ MODULE LidarSim_Subs
 
     USE LidarSim_Types
     USE NWTC_Library
-    USE InflowWind_Subs
-    USE InflowWind_Types
 
     IMPLICIT NONE
     PRIVATE
@@ -499,85 +497,34 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     
     
 !#########################################################################################################################################################################   
-    
-    SUBROUTINE LidarSim_CalculateVlos(p, UnitVector_I, Vlos, MeasuringPosition_I, LidarPosition_I, WeightPos, WindVel, &
-    Time, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, IfW_m, ErrStat, ErrMsg)
+    SUBROUTINE LidarSim_CalculateVlos(p, UnitVector_I, Vlos, WeightPos, WindVel, ErrStat, ErrMsg)
     
     IMPLICIT                                NONE
     CHARACTER(*),                           PARAMETER       ::  RoutineName="LidarSim_CalculateVlos"
     
     TYPE(LidarSim_ParameterType),           INTENT(IN   )   ::  p                           !parameter data of the lidar module
     REAL(ReKi),                             INTENT(IN   )   ::  UnitVector_I(3)             !Line of Sight Unit Vector
-    REAL(ReKi),                             INTENT(INOUT)   ::  MeasuringPosition_I(3)      !Position of the measuring point
-    REAL(ReKi),                             INTENT(IN   )   ::  LidarPosition_I(3)          !Position of the measuring point
     REAL(ReKi),                             INTENT(IN   )   ::  WeightPos(:,:)              ! Position of weighted point (from mesh)
     REAL(ReKi),                             INTENT(IN   )   ::  WindVel(:,:)                ! Wind velocity array from IfW at weighted point
     REAL(ReKi),                             INTENT(  OUT)   ::  Vlos                        !Calculated speed in los direction
-    REAL(DbKi),                             INTENT(IN   )   ::  Time                        !< Current simulation time in seconds
 
     !Error Variables
     INTEGER(IntKi),                         INTENT(  OUT)   ::  ErrStat                     !< Error status of the operation
     CHARACTER(*),                           INTENT(  OUT)   ::  ErrMsg                      !< Error message if ErrStat /= ErrID_None
     
-!FIXME: remove IfW completely from here
-    !IfW Parameter
-    TYPE(InflowWind_ParameterType),         INTENT(IN   )   ::  IfW_p                       !< Parameters
-    TYPE(InflowWind_ContinuousStateType),   INTENT(IN   )   ::  IfW_ContStates              !< Continuous states at Time
-    TYPE(InflowWind_DiscreteStateType),     INTENT(IN   )   ::  IfW_DiscStates              !< Discrete states at Time
-    TYPE(InflowWind_ConstraintStateType),   INTENT(IN   )   ::  IfW_ConstrStates            !< Constraint states at Time
-    TYPE(InflowWind_OtherStateType),        INTENT(IN   )   ::  IfW_OtherStates             !< Other/optimization states at Time
-    TYPE(InflowWind_MiscVarType),           INTENT(INOUT)   ::  IfW_m                       !< Misc variables for optimization (not copied in glue code)
-    
     !Local Variables
-    TYPE(InflowWind_InputType)              ::  InputForCalculation                         ! input data field for the calculation in the InflowWind module
-    TYPE(InflowWind_OutputType)             ::  OutputForCalculation                        ! data field were the calculated speed is written from the InflowWind module
     INTEGER(IntKi)                          ::  Counter                                     ! Counter for the loop for the different weightings of the point
-    REAL(ReKi),DIMENSION(:), ALLOCATABLE    ::  Vlos_tmp                                    !< Array with all temporary Vlos
+    REAL(ReKi)                              ::  Vlos_tmp(p%nWeightPts)                      !< Array with all temporary Vlos
     
-    ! Temporary variables for error handling
-    INTEGER(IntKi)                                          ::  ErrStat2        
-    CHARACTER(ErrMsgLen)                                    ::  ErrMsg2
-
     !Initialize error values
     ErrStat        =  ErrID_None
     ErrMsg         =  ""
-    
-    CALL AllocAry(InputForCalculation%PositionXYZ, 3,1, 'InputForCalculation%PositionXYZ',ErrStat2, ErrMsg2)        !Allocating needed space for the input
-    CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-    CALL AllocAry(OutputForCalculation%VelocityUVW, 3,1, 'OutputForCalculation%VelocityUVW',ErrStat2, ErrMsg2)      !Allocating needed space for the output
-    CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-    CALL AllocAry(Vlos_tmp, p%nWeightPts, 'Vlos_tmp%VelocityUVW',ErrStat2, ErrMsg2)                                 !Allocating space for temporary windspeeds
-    CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-     
-    IF(IfW_p%WindType == 1 .OR. IfW_p%WindType == 2)Then !Uniform Wind 2 (und steady 1)
-        MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
-        DO Counter = 1, p%nWeightPts
-!QUESTION: is the p%WeightingDistance about the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
-            ! position of the weighted measuring point
-            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
-!FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
-            CALL CalculateOutput(Time + DBLE(-InputForCalculation%PositionXYZ(1,1)/p%UnifWind_Xoffset_URef), InputForCalculation, IfW_p, &
-                                    IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, IfW_OtherStates, OutputForCalculation, &
-                                    IfW_m, .FALSE., ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-            Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
-        END DO
-    ELSE IF(IfW_p%WindType ==  3 .OR. IfW_p%WindType == 4) THEN        !Bladed Turublent 4 ( und TurbSim 3)
-        DO Counter = 1, p%nWeightPts
-            ! position of the weighted measuring point
-            InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
-!FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.
-            CALL CalculateOutput(Time, InputForCalculation, IfW_p, IfW_ContStates, IfW_DiscStates, IfW_ConstrStates, &
-                                       IfW_OtherStates, OutputForCalculation, IfW_m, .FALSE., ErrStat2, ErrMsg2 )
-            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-            Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
-        END DO
-    END IF
-    Vlos = DOT_PRODUCT(Vlos_tmp, p%Weighting)           !Calculation of the weighted windspeed
 
-    DEALLOCATE (InputForCalculation%PositionXYZ)        !Free Input Positions for the next measurement
-    DEALLOCATE (OutputForCalculation%VelocityUVW)       !Free Ouput Positions for the next measurement
-    DEALLOCATE (Vlos_tmp)
+
+    DO Counter = 1, p%nWeightPts
+        Vlos_tmp(Counter) = - DOT_PRODUCT(WindVel(:,Counter),UnitVector_I)
+    END DO
+    Vlos = DOT_PRODUCT(Vlos_tmp, p%Weighting)           !Calculation of the weighted windspeed
 
 END SUBROUTINE LidarSim_CalculateVlos
     

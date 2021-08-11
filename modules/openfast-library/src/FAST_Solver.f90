@@ -5765,9 +5765,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       CALL LidarSim_InputSolve( p_FAST, LidSim%Input(1), IfW%y, ED%y, SD%y, SrvD%y, MeshMapData, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL LidarSim_CalcOutput(this_time, LidSim%Input(1), LidSim%p, LidSim%x(this_state), LidSim%xd(this_state), &
-                           LidSim%z(this_state), LidSim%OtherSt(this_state), LidSim%y, LidSim%m,   &
-                       IfW%p,IfW%x(this_state), IfW%xd(this_state), IfW%z(this_state), IfW%OtherSt(this_state), IfW%m,&
-             ErrStat2, ErrMsg2)        
+                           LidSim%z(this_state), LidSim%OtherSt(this_state), LidSim%y, LidSim%m, ErrStat2, ErrMsg2)        
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    ENDIF
 
