@@ -560,6 +560,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       END IF
       IF ( p_FAST%CompServo == Module_SrvD ) THEN
          Init%InData_SrvD%GatesPerBeam = LidSim%p%GatesPerBeam
+!FIXME: this will change with new interface
          Init%InData_SrvD%MAXDLLChainOutputs = LidSim%p%MAXDLLChainOutputs
       END IF
    ELSE
@@ -587,6 +588,12 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       Init%InData_IfW%RootName         = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_IfW))
       Init%InData_IfW%UseInputFile     = .TRUE.
       Init%InData_IfW%FixedWindFileRootName = .FALSE.
+      Init%InData_IfW%BoxExceedAllowF  = .false.
+      Init%InData_IfW%BoxExceedAllowIdx= huge(1_IntKi)      ! set to largest possible integer to default to unused
+      ! For testing LidarSim, calculate the XOffset for the uniform wind files
+      Init%InData_IfW%UW_Override_URefF   = .false.
+      Init%InData_IfW%UW_Override_URef    = 0.0_ReKi 
+      Init%InData_IfW%UW_Calc_XoffsetIdx  = huge(1_IntKi)
 
       Init%InData_IfW%NumWindPoints = 0
       IF ( p_FAST%CompServo == Module_SrvD ) Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + 1
@@ -604,12 +611,26 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
             Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + AD%Input(1)%rotors(1)%NacelleMotion%NNodes ! 1 point         
          endif
          ! Wake
+!FIXME: set the box excedence flag starting with the wake points
          if (allocated(AD%OtherSt(STATE_CURR)%WakeLocationPoints)) then
+            Init%InData_IfW%BoxExceedAllowF = .true.
+            Init%InData_IfW%BoxExceedAllowIdx = min(Init%InData_IfW%BoxExceedAllowIdx, Init%InData_IfW%NumWindPoints+1)
             Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + size(AD%OtherSt(STATE_CURR)%WakeLocationPoints,DIM=2)
          end if
       END IF
       ! the LidarSim_InputSolve routine expects lidar data to be the very last set of points.  Update that routine if anything changes here.
-      IF ( p_FAST%CompLidar == Module_LidSim ) Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + LidSim%y%LidarMeasMesh%Nnodes
+      if ( p_FAST%CompLidar == Module_LidSim ) then
+         ! allow extrapolating wind for points outside wind box -- set if not starting with OLAF points
+         Init%InData_IfW%BoxExceedAllowF     = .true.
+         Init%InData_IfW%BoxExceedAllowIdx   = min(Init%InData_IfW%BoxExceedAllowIdx, Init%InData_IfW%NumWindPoints+1)
+         ! Add URef override of UniformWind for lidar testing
+         if ( Init%OutData_LidSim%UnifWind_Xoffset_URefF ) then
+            Init%InData_IfW%UW_Override_URefF   = Init%OutData_LidSim%UnifWind_Xoffset_URefF
+            Init%InData_IfW%UW_Override_URef    = Init%OutData_LidSim%UnifWind_Xoffset_URef
+            Init%InData_IfW%UW_Calc_XoffsetIdx  = Init%InData_IfW%NumWindPoints+1
+         endif
+         Init%InData_IfW%NumWindPoints = Init%InData_IfW%NumWindPoints + LidSim%y%LidarMeasMesh%Nnodes
+      endif
 
       ! lidar
       Init%InData_IfW%lidar%Tmax                   = p_FAST%TMax

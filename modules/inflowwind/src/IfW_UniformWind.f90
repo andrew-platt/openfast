@@ -275,6 +275,43 @@ SUBROUTINE IfW_UniformWind_Init(InitData, ParamData, MiscVars, InitOutData, ErrS
       ! Number of timesteps
    InitOutData%WindFileNumTSteps    =  ParamData%NumDataLines
 
+      ! Save mean wind speed
+   if (ParamData%NumDataLines == 1) then
+      ParamData%MWS = ParamData%V(1)
+   else
+      ParamData%MWS = 0.0_ReKi               
+      do i=2,ParamData%NumDataLines
+         ParamData%MWS = ParamData%MWS + &
+                                        0.5_ReKi*(ParamData%V(i)+ParamData%V(i-1))*&
+                                                 (ParamData%Tdata(i)-ParamData%Tdata(i-1))
+      end do
+      ParamData%MWS = ParamData%MWS / &
+                  ( ParamData%Tdata(ParamData%NumDataLines) - ParamData%Tdata(1) )
+   endif
+
+
+      !-------------------------------------------------------------------------------------------------
+      ! Set overrides for calculating wind offsets (only for use on LidarSim points)
+      !-------------------------------------------------------------------------------------------------
+
+   ParamData%Override_URefF   =  InitData%Override_URefF
+   ParamData%Override_URef    =  InitData%Override_URef
+   ParamData%Calc_XoffsetIdx  =  InitData%Calc_XoffsetIdx
+
+   if ( ParamData%Calc_XoffsetIdx <= InitData%NumWindPts ) then
+      call WrScr('############################################################################')
+      call WrScr('   WARNING: calculating time shifts of uniform wind velocities for LidarSim.')
+      call WrScr('            This is non-physical and should only be used for testing.')
+      call WrScr('############################################################################')
+      if ( ParamData%Override_URefF ) then
+         TmpErrMsg   = 'Overriding the URef value from input file for calculating time shifts of ' // &
+                       'LidarSim velocities with URef = '//trim(Num2LStr(ParamData%Override_URef))
+         CALL SetErrStat(ErrID_Warn,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+      endif
+   endif
+
+
+
       !-------------------------------------------------------------------------------------------------
       ! Print warnings and messages
       !-------------------------------------------------------------------------------------------------
@@ -452,7 +489,10 @@ SUBROUTINE IfW_UniformWind_CalcOutput(Time, PositionXYZ, p, Velocity, DiskVel, m
 
 
       ! local variables
-   INTEGER(IntKi)                                              :: NumPoints      ! Number of points specified by the PositionXYZ array
+   INTEGER(IntKi)                                              :: TotalPoints    ! Number of points specified by the PositionXYZ array
+   INTEGER(IntKi)                                              :: NumPoints      ! Number of points specified by the PositionXYZ array without time shifting
+   REAL(DbKi)                                                  :: T_pt           ! Time to use for this point (hack for timeshifting LidarSim requested points)
+   REAL(ReKi)                                                  :: URef_Shift     ! reference wind speed for time shift of LidarSim requested points 
    TYPE(IfW_UniformWind_Intrp)                                 :: op             ! interpolated values of InterpParams
    INTEGER(IntKi)                                              :: PointNum       ! a loop counter for the current point
 
@@ -471,7 +511,8 @@ SUBROUTINE IfW_UniformWind_CalcOutput(Time, PositionXYZ, p, Velocity, DiskVel, m
 
       ! The array is transposed so that the number of points is the second index, x/y/z is the first.
       ! This is just in case we only have a single point, the SIZE command returns the correct number of points.
-   NumPoints   =  SIZE(PositionXYZ,DIM=2)
+   TotalPoints   =  SIZE(PositionXYZ,DIM=2)
+   NumPoints = min(TotalPoints,p%Calc_XoffsetIdx-1)       ! all normal points
 
 
    !-------------------------------------------------------------------------------------------------
@@ -507,6 +548,51 @@ SUBROUTINE IfW_UniformWind_CalcOutput(Time, PositionXYZ, p, Velocity, DiskVel, m
    !$OMP END PARALLEL
 
    IF (ErrStat >= AbortErrLev) RETURN ! Return cannot be in parallel loop
+
+
+   !-------------------------------------------------------------------------------------------------
+   !> 2. HACK for time shifting for LidarSim testing
+   !!    LidarSim may not request shifting of points, so check based on value of Calc_XoffsetIdx (is
+   !!    set to huge if not used).
+   !-------------------------------------------------------------------------------------------------
+   if (TotalPoints >= p%Calc_XoffsetIdx) then
+      if (p%Override_URefF) then
+         URef_Shift = p%Override_URef
+      else
+         URef_Shift = p%MWS
+      endif
+
+      !$OMP PARALLEL default(shared) if(NumPoints>1000)
+      !$OMP do private(PointNum, TmpErrStat, TmpErrMsg ) schedule(runtime)
+      DO PointNum = p%Calc_XoffsetIdx, TotalPoints
+
+         T_pt = Time + real(-PositionXYZ(1,PointNum)/URef_Shift, DbKi)
+         CALL InterpParams(T_pt, p, m, op)   
+      
+            ! Calculate the velocity for the position
+         call GetWindSpeed(PositionXYZ(:,PointNum), p, op, Velocity(:,PointNum), TmpErrStat, TmpErrMsg)
+ 
+            ! Error handling
+         !CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+         IF (TmpErrStat >= AbortErrLev) THEN
+            TmpErrMsg=  trim(TmpErrMsg)//" Error calculating the wind speed at position ("//   &
+                        TRIM(Num2LStr(PositionXYZ(1,PointNum)))//", "// &
+                        TRIM(Num2LStr(PositionXYZ(2,PointNum)))//", "// &
+                        TRIM(Num2LStr(PositionXYZ(3,PointNum)))//") in the wind-file coordinates"
+            !$OMP CRITICAL  ! Needed to avoid data race on ErrStat and ErrMsg
+            ErrStat = ErrID_None
+            ErrMsg  = ""
+            CALL SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+            !$OMP END CRITICAL
+         ENDIF
+ 
+      ENDDO
+      !$OMP END DO 
+      !$OMP END PARALLEL
+ 
+      IF (ErrStat >= AbortErrLev) RETURN ! Return cannot be in parallel loop
+   endif
+
 
       ! DiskVel term -- this represents the average across the disk -- sort of.  This changes for AeroDyn 15
    DiskVel   =  WindInf_ADhack_diskVel(Time, p, m, TmpErrStat, TmpErrMsg)

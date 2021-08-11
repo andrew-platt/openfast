@@ -18,6 +18,10 @@ typedef  ^                       ^                       ReKi         RefLength 
 typedef  ^                       ^                       IntKi        SumFileUnit       -     -     -     "Unit number for the summary file (-1 for none).  Provided by IfW." -
 typedef  ^                       ^                       LOGICAL      UseInputFile      -   .TRUE.  -     "Flag for toggling file based IO in wind type 2."                -
 typedef  ^                       ^                       FileInfoType   PassedFileData  -     -     -     "Optional slot for wind type 2 data if file IO is not used."                -
+typedef  ^                       ^                       IntKi        NumWindPts        -     -     -     "Number of wind points" -
+typedef  ^                       ^                       LOGICAL      Override_URefF    -     -     -     "Flag indicating URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" -
+typedef  ^                       ^                       ReKi         Override_URef     -     -     -     "URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" m/s
+typedef  ^                       ^                       IntKi        Calc_XoffsetIdx   -     -     -     "Index for start of for uniformwind Xoffset calculations (non-physical for testing only -- used only by LidarSim)" -
 
 
 
@@ -50,6 +54,10 @@ typedef  ^                       ^                       ReKi     VGUST         
 typedef  ^                       ^                       ReKi     RefHt             -     -     -     "reference height; was HH (hub height); used to center the wind"  meters
 typedef  ^                       ^                       ReKi     RefLength         -     -     -     "reference length used to scale the linear shear"              meters
 typedef  ^                       ^                       IntKi    NumDataLines      -     -     -     ""                                                             -
+typedef  ^                       ^                       ReKi     MWS               -     -     -     "Mean Wind Speed"                                              meters/sec
+typedef  ^                       ^                       LOGICAL  Override_URefF    -     -     -     "Flag indicating URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" -
+typedef  ^                       ^                       ReKi     Override_URef     -     -     -     "URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" m/s
+typedef  ^                       ^                       IntKi    Calc_XoffsetIdx   -     -     -     "Index for start of for uniformwind Xoffset calculations (non-physical for testing only -- used only by LidarSim)" -
 
 # ..... Input (dummy type for extrap/interp routine) ................................................................................................................
 #typedef  ^                    InputType                  SiKi     dummy             -     -     -     "dummy type because we need extrap/interp routine if we put the below outputs in the InflowWind type"                            

@@ -112,6 +112,12 @@ typedef  ^                       ^                 LOGICAL           WindType2Us
 typedef  ^                       ^                 FileInfoType      WindType2Data    -     -     -      "Optional slot for wind type 2 data if file IO is not used."                -
 typedef  ^                       ^          Lidar_InitInputType      lidar             -     -     -     "InitInput for lidar data"                                             -
 typedef  ^                       ^          IfW_4Dext_InitInputType  FDext             -     -     -     "InitInput for lidar data"                                             -
+typedef  ^                       ^                 IntKi             BoxExceedAllowIdx    -  -1       -     "Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim)" -
+typedef  ^                       ^                 LOGICAL           BoxExceedAllowF      -  .FALSE.  -     "Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim)" -
+typedef  ^                       ^                 LOGICAL           UW_Override_URefF    -  .FALSE.  -     "UniformWind only. Flag indicating URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" -
+typedef  ^                       ^                 ReKi              UW_Override_URef     -  0        -     "UniformWind only. URef override from LidarSim module for calculating approaching wind front (non-physical for testing only)" m/s
+typedef  ^                       ^                 IntKi             UW_Calc_XoffsetIdx   -  0        -     "UniformWind only. Index for start of LidarSim module wind uniformwind Xoffset calculations (non-physical for testing only)" -
+
 
 
 # Init Output
@@ -170,6 +176,8 @@ typedef  ^                       ^                 IntKi             NumOuts    
 typedef  ^                       ^                 OutParmType       OutParam          {:}   -     -     "Names and units (and other characteristics) of all requested output parameters" -
 typedef  ^                       ^                 IntKi             OutParamLinIndx  {:}{:} -     -     "Index into WriteOutput for WindViXYZ in linearization analysis" -
 typedef  ^                       ^          lidar_ParameterType      lidar             -     -     -     "Lidar parameter data"                                       -
+typedef  ^                       ^                 IntKi             BoxExceedAllowIdx    -  -     -     "Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim)" -
+typedef  ^                       ^                 LOGICAL           BoxExceedAllowF      -  -     -     "Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim)" -
 
 
 # ..... Inputs ....................................................................................................................

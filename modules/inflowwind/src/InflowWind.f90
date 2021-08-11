@@ -410,6 +410,11 @@ SUBROUTINE InflowWind_Init( InitInp,   InputGuess,    p, ContStates, DiscStates,
             Uniform_InitData%UseInputFile             =  InitInp%WindType2UseInputFile
             Uniform_InitData%PassedFileData           =  InitInp%WindType2Data
 
+               ! For calculating time offsets (hack for testing of LidarSim)
+            Uniform_InitData%Override_URefF           =  InitInp%UW_Override_URefF
+            Uniform_InitData%Override_URef            =  InitInp%UW_Override_URef
+            Uniform_InitData%Calc_XoffsetIdx          =  InitInp%UW_Calc_XoffsetIdx
+
                ! Initialize the UniformWind module
             CALL IfW_UniformWind_Init(Uniform_InitData, p%UniformWind, &
                         m%UniformWind, Uniform_InitOutData,  TmpErrStat, TmpErrMsg)
@@ -450,19 +455,7 @@ SUBROUTINE InflowWind_Init( InitInp,   InputGuess,    p, ContStates, DiscStates,
             InitOutData%WindFileInfo%IsBinary         =  .FALSE.
             InitOutData%WindFileInfo%TI               =  0.0_ReKi
             InitOutData%WindFileInfo%TI_listed        =  .FALSE.
-
-            if (p%UniformWind%NumDataLines == 1) then
-               InitOutData%WindFileInfo%MWS = p%UniformWind%V(1)
-            else
-               InitOutData%WindFileInfo%MWS = 0.0_ReKi               
-               do i=2,p%UniformWind%NumDataLines
-                  InitOutData%WindFileInfo%MWS = InitOutData%WindFileInfo%MWS + &
-                                                 0.5_ReKi*(p%UniformWind%V(i)+p%UniformWind%V(i-1))*&
-                                                          (p%UniformWind%Tdata(i)-p%UniformWind%Tdata(i-1))
-               end do
-               InitOutData%WindFileInfo%MWS = InitOutData%WindFileInfo%MWS / &
-                           ( p%UniformWind%Tdata(p%UniformWind%NumDataLines) - p%UniformWind%Tdata(1) )
-            end if
+            InitOutData%WindFileInfo%MWS              =  p%UniformWind%MWS
             
             
                ! Check if the fist data point from the file is not along the X-axis while applying the windfield rotation

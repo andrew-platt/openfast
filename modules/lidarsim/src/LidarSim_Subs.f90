@@ -546,12 +546,12 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
     CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
     CALL AllocAry(OutputForCalculation%VelocityUVW, 3,1, 'OutputForCalculation%VelocityUVW',ErrStat2, ErrMsg2)      !Allocating needed space for the output
     CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-    CALL AllocAry(Vlos_tmp ,SIZE(p%Weighting), 'Vlos_tmp%VelocityUVW',ErrStat2, ErrMsg2)                            !Allocating space for temporary windspeeds
+    CALL AllocAry(Vlos_tmp, p%nWeightPts, 'Vlos_tmp%VelocityUVW',ErrStat2, ErrMsg2)                                 !Allocating space for temporary windspeeds
     CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
      
     IF(IfW_p%WindType == 1 .OR. IfW_p%WindType == 2)Then !Uniform Wind 2 (und steady 1)
         MeasuringPosition_I(1) = MeasuringPosition_I(1)-LidarPosition_I(1)  !In the uniform wind case. the wind hits the turbine at the same time indepentend of the x shift
-        DO Counter = 1, SIZE(p%Weighting)
+        DO Counter = 1, p%nWeightPts
 !QUESTION: is the p%WeightingDistance about the measurement position, or from the lidar?? If the latter, there is a problem with the below calculations
             ! position of the weighted measuring point
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
@@ -563,7 +563,7 @@ END SUBROUTINE LidarSim_ParsePrimaryFileInfo
             Vlos_tmp(Counter) = - DOT_PRODUCT(OutputForCalculation%VelocityUVW(:,1),UnitVector_I)
         END DO
     ELSE IF(IfW_p%WindType ==  3 .OR. IfW_p%WindType == 4) THEN        !Bladed Turublent 4 ( und TurbSim 3)
-        DO Counter = 1, SIZE(p%Weighting)
+        DO Counter = 1, p%nWeightPts
             ! position of the weighted measuring point
             InputForCalculation%PositionXYZ(:,1) = MeasuringPosition_I + p%WeightingDistance(Counter) * UnitVector_I
 !FIXME: Cannot call InflowWind directly like this.  This is not allowed by the framework.

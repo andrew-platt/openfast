@@ -41,6 +41,10 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: SumFileUnit      !< Unit number for the summary file (-1 for none).  Provided by IfW. [-]
     LOGICAL  :: UseInputFile = .TRUE.      !< Flag for toggling file based IO in wind type 2. [-]
     TYPE(FileInfoType)  :: PassedFileData      !< Optional slot for wind type 2 data if file IO is not used. [-]
+    INTEGER(IntKi)  :: NumWindPts      !< Number of wind points [-]
+    LOGICAL  :: Override_URefF      !< Flag indicating URef override from LidarSim module for calculating approaching wind front (non-physical for testing only) [-]
+    REAL(ReKi)  :: Override_URef      !< URef override from LidarSim module for calculating approaching wind front (non-physical for testing only) [m/s]
+    INTEGER(IntKi)  :: Calc_XoffsetIdx      !< Index for start of for uniformwind Xoffset calculations (non-physical for testing only -- used only by LidarSim) [-]
   END TYPE IfW_UniformWind_InitInputType
 ! =======================
 ! =========  IfW_UniformWind_InitOutputType  =======
@@ -71,6 +75,10 @@ IMPLICIT NONE
     REAL(ReKi)  :: RefHt      !< reference height; was HH (hub height); used to center the wind [meters]
     REAL(ReKi)  :: RefLength      !< reference length used to scale the linear shear [meters]
     INTEGER(IntKi)  :: NumDataLines      !<  [-]
+    REAL(ReKi)  :: MWS      !< Mean Wind Speed [meters/sec]
+    LOGICAL  :: Override_URefF      !< Flag indicating URef override from LidarSim module for calculating approaching wind front (non-physical for testing only) [-]
+    REAL(ReKi)  :: Override_URef      !< URef override from LidarSim module for calculating approaching wind front (non-physical for testing only) [m/s]
+    INTEGER(IntKi)  :: Calc_XoffsetIdx      !< Index for start of for uniformwind Xoffset calculations (non-physical for testing only -- used only by LidarSim) [-]
   END TYPE IfW_UniformWind_ParameterType
 ! =======================
 ! =========  IfW_UniformWind_Intrp  =======
@@ -109,6 +117,10 @@ CONTAINS
       CALL NWTC_Library_Copyfileinfotype( SrcInitInputData%PassedFileData, DstInitInputData%PassedFileData, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
+    DstInitInputData%NumWindPts = SrcInitInputData%NumWindPts
+    DstInitInputData%Override_URefF = SrcInitInputData%Override_URefF
+    DstInitInputData%Override_URef = SrcInitInputData%Override_URef
+    DstInitInputData%Calc_XoffsetIdx = SrcInitInputData%Calc_XoffsetIdx
  END SUBROUTINE IfW_UniformWind_CopyInitInput
 
  SUBROUTINE IfW_UniformWind_DestroyInitInput( InitInputData, ErrStat, ErrMsg )
@@ -181,6 +193,10 @@ CONTAINS
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
+      Int_BufSz  = Int_BufSz  + 1  ! NumWindPts
+      Int_BufSz  = Int_BufSz  + 1  ! Override_URefF
+      Re_BufSz   = Re_BufSz   + 1  ! Override_URef
+      Int_BufSz  = Int_BufSz  + 1  ! Calc_XoffsetIdx
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -248,6 +264,14 @@ CONTAINS
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
+    IntKiBuf(Int_Xferred) = InData%NumWindPts
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%Override_URefF, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
+    ReKiBuf(Re_Xferred) = InData%Override_URef
+    Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%Calc_XoffsetIdx
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_UniformWind_PackInitInput
 
  SUBROUTINE IfW_UniformWind_UnPackInitInput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -329,6 +353,14 @@ CONTAINS
       IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    OutData%NumWindPts = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%Override_URefF = TRANSFER(IntKiBuf(Int_Xferred), OutData%Override_URefF)
+    Int_Xferred = Int_Xferred + 1
+    OutData%Override_URef = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
+    OutData%Calc_XoffsetIdx = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_UniformWind_UnPackInitInput
 
  SUBROUTINE IfW_UniformWind_CopyInitOutput( SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg )
@@ -823,6 +855,10 @@ ENDIF
     DstParamData%RefHt = SrcParamData%RefHt
     DstParamData%RefLength = SrcParamData%RefLength
     DstParamData%NumDataLines = SrcParamData%NumDataLines
+    DstParamData%MWS = SrcParamData%MWS
+    DstParamData%Override_URefF = SrcParamData%Override_URefF
+    DstParamData%Override_URef = SrcParamData%Override_URef
+    DstParamData%Calc_XoffsetIdx = SrcParamData%Calc_XoffsetIdx
  END SUBROUTINE IfW_UniformWind_CopyParam
 
  SUBROUTINE IfW_UniformWind_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -946,6 +982,10 @@ ENDIF
       Re_BufSz   = Re_BufSz   + 1  ! RefHt
       Re_BufSz   = Re_BufSz   + 1  ! RefLength
       Int_BufSz  = Int_BufSz  + 1  ! NumDataLines
+      Re_BufSz   = Re_BufSz   + 1  ! MWS
+      Int_BufSz  = Int_BufSz  + 1  ! Override_URefF
+      Re_BufSz   = Re_BufSz   + 1  ! Override_URef
+      Int_BufSz  = Int_BufSz  + 1  ! Calc_XoffsetIdx
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -1113,6 +1153,14 @@ ENDIF
     ReKiBuf(Re_Xferred) = InData%RefLength
     Re_Xferred = Re_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%NumDataLines
+    Int_Xferred = Int_Xferred + 1
+    ReKiBuf(Re_Xferred) = InData%MWS
+    Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%Override_URefF, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
+    ReKiBuf(Re_Xferred) = InData%Override_URef
+    Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%Calc_XoffsetIdx
     Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_UniformWind_PackParam
 
@@ -1310,6 +1358,14 @@ ENDIF
     OutData%RefLength = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
     OutData%NumDataLines = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%MWS = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
+    OutData%Override_URefF = TRANSFER(IntKiBuf(Int_Xferred), OutData%Override_URefF)
+    Int_Xferred = Int_Xferred + 1
+    OutData%Override_URef = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
+    OutData%Calc_XoffsetIdx = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_UniformWind_UnPackParam
 
