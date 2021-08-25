@@ -44,6 +44,8 @@ IMPLICIT NONE
     REAL(ReKi)  :: PLExp = 0      !< Power law exponent (used for PL wind profile type only) [-]
     REAL(ReKi)  :: Z0 = 0      !< Surface roughness length (used for LOG wind profile type only) [-]
     REAL(ReKi)  :: XOffset = 0      !< distance offset for FF wind files [m]
+    INTEGER(IntKi)  :: BoxExceedAllowIdx      !< Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
+    LOGICAL  :: BoxExceedAllowF      !< Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
   END TYPE IfW_FFWind_InitInputType
 ! =======================
 ! =========  IfW_FFWind_ParameterType  =======
@@ -52,6 +54,7 @@ IMPLICIT NONE
     LOGICAL  :: InterpTower = .FALSE.      !< Flag to indicate if we should interpolate wind speeds below the tower [-]
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: FFData      !< Array of FF data [-]
     REAL(SiKi) , DIMENSION(:,:,:), ALLOCATABLE  :: FFTower      !< Array of data along tower, below FF array [-]
+    REAL(SiKi) , DIMENSION(:,:,:), ALLOCATABLE  :: FFAvgData      !< Average velocity profile by Z and time [-]
     REAL(ReKi)  :: FFDTime = 0      !< Delta time [seconds]
     REAL(ReKi)  :: FFRate = 0      !< Data rate (1/FFDTime) [Hertz]
     REAL(ReKi)  :: FFYHWid = 0      !< Half the grid width [meters]
@@ -74,6 +77,8 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: WindProfileType = -1      !< Wind profile type (0=constant;1=logarithmic;2=power law) [-]
     REAL(ReKi)  :: PLExp = 0      !< Power law exponent (used for PL wind profile type only) [-]
     REAL(ReKi)  :: Z0 = 0      !< Surface roughness length (used for LOG wind profile type only) [-]
+    LOGICAL  :: BoxExceedAllowF = .FALSE.      !< Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
+    INTEGER(IntKi)  :: BoxExceedAllowIdx = -1      !< Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
   END TYPE IfW_FFWind_ParameterType
 ! =======================
 CONTAINS
@@ -104,6 +109,8 @@ CONTAINS
     DstInitInputData%PLExp = SrcInitInputData%PLExp
     DstInitInputData%Z0 = SrcInitInputData%Z0
     DstInitInputData%XOffset = SrcInitInputData%XOffset
+    DstInitInputData%BoxExceedAllowIdx = SrcInitInputData%BoxExceedAllowIdx
+    DstInitInputData%BoxExceedAllowF = SrcInitInputData%BoxExceedAllowF
  END SUBROUTINE IfW_FFWind_CopyInitInput
 
  SUBROUTINE IfW_FFWind_DestroyInitInput( InitInputData, ErrStat, ErrMsg )
@@ -161,6 +168,8 @@ CONTAINS
       Re_BufSz   = Re_BufSz   + 1  ! PLExp
       Re_BufSz   = Re_BufSz   + 1  ! Z0
       Re_BufSz   = Re_BufSz   + 1  ! XOffset
+      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowIdx
+      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -210,6 +219,10 @@ CONTAINS
     Re_Xferred = Re_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%XOffset
     Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%BoxExceedAllowIdx
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%BoxExceedAllowF, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_FFWind_PackInitInput
 
  SUBROUTINE IfW_FFWind_UnPackInitInput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -268,6 +281,10 @@ CONTAINS
     Re_Xferred = Re_Xferred + 1
     OutData%XOffset = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
+    OutData%BoxExceedAllowIdx = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%BoxExceedAllowF = TRANSFER(IntKiBuf(Int_Xferred), OutData%BoxExceedAllowF)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_FFWind_UnPackInitInput
 
  SUBROUTINE IfW_FFWind_CopyParam( SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg )
@@ -324,6 +341,22 @@ IF (ALLOCATED(SrcParamData%FFTower)) THEN
   END IF
     DstParamData%FFTower = SrcParamData%FFTower
 ENDIF
+IF (ALLOCATED(SrcParamData%FFAvgData)) THEN
+  i1_l = LBOUND(SrcParamData%FFAvgData,1)
+  i1_u = UBOUND(SrcParamData%FFAvgData,1)
+  i2_l = LBOUND(SrcParamData%FFAvgData,2)
+  i2_u = UBOUND(SrcParamData%FFAvgData,2)
+  i3_l = LBOUND(SrcParamData%FFAvgData,3)
+  i3_u = UBOUND(SrcParamData%FFAvgData,3)
+  IF (.NOT. ALLOCATED(DstParamData%FFAvgData)) THEN 
+    ALLOCATE(DstParamData%FFAvgData(i1_l:i1_u,i2_l:i2_u,i3_l:i3_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%FFAvgData.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstParamData%FFAvgData = SrcParamData%FFAvgData
+ENDIF
     DstParamData%FFDTime = SrcParamData%FFDTime
     DstParamData%FFRate = SrcParamData%FFRate
     DstParamData%FFYHWid = SrcParamData%FFYHWid
@@ -346,6 +379,8 @@ ENDIF
     DstParamData%WindProfileType = SrcParamData%WindProfileType
     DstParamData%PLExp = SrcParamData%PLExp
     DstParamData%Z0 = SrcParamData%Z0
+    DstParamData%BoxExceedAllowF = SrcParamData%BoxExceedAllowF
+    DstParamData%BoxExceedAllowIdx = SrcParamData%BoxExceedAllowIdx
  END SUBROUTINE IfW_FFWind_CopyParam
 
  SUBROUTINE IfW_FFWind_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -362,6 +397,9 @@ IF (ALLOCATED(ParamData%FFData)) THEN
 ENDIF
 IF (ALLOCATED(ParamData%FFTower)) THEN
   DEALLOCATE(ParamData%FFTower)
+ENDIF
+IF (ALLOCATED(ParamData%FFAvgData)) THEN
+  DEALLOCATE(ParamData%FFAvgData)
 ENDIF
  END SUBROUTINE IfW_FFWind_DestroyParam
 
@@ -412,6 +450,11 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*3  ! FFTower upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%FFTower)  ! FFTower
   END IF
+  Int_BufSz   = Int_BufSz   + 1     ! FFAvgData allocated yes/no
+  IF ( ALLOCATED(InData%FFAvgData) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*3  ! FFAvgData upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%FFAvgData)  ! FFAvgData
+  END IF
       Re_BufSz   = Re_BufSz   + 1  ! FFDTime
       Re_BufSz   = Re_BufSz   + 1  ! FFRate
       Re_BufSz   = Re_BufSz   + 1  ! FFYHWid
@@ -434,6 +477,8 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1  ! WindProfileType
       Re_BufSz   = Re_BufSz   + 1  ! PLExp
       Re_BufSz   = Re_BufSz   + 1  ! Z0
+      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowF
+      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowIdx
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -520,6 +565,31 @@ ENDIF
         END DO
       END DO
   END IF
+  IF ( .NOT. ALLOCATED(InData%FFAvgData) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%FFAvgData,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%FFAvgData,1)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%FFAvgData,2)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%FFAvgData,2)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%FFAvgData,3)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%FFAvgData,3)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i3 = LBOUND(InData%FFAvgData,3), UBOUND(InData%FFAvgData,3)
+        DO i2 = LBOUND(InData%FFAvgData,2), UBOUND(InData%FFAvgData,2)
+          DO i1 = LBOUND(InData%FFAvgData,1), UBOUND(InData%FFAvgData,1)
+            ReKiBuf(Re_Xferred) = InData%FFAvgData(i1,i2,i3)
+            Re_Xferred = Re_Xferred + 1
+          END DO
+        END DO
+      END DO
+  END IF
     ReKiBuf(Re_Xferred) = InData%FFDTime
     Re_Xferred = Re_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%FFRate
@@ -564,6 +634,10 @@ ENDIF
     Re_Xferred = Re_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%Z0
     Re_Xferred = Re_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%BoxExceedAllowF, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%BoxExceedAllowIdx
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_FFWind_PackParam
 
  SUBROUTINE IfW_FFWind_UnPackParam( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -661,6 +735,34 @@ ENDIF
         END DO
       END DO
   END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! FFAvgData not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i2_l = IntKiBuf( Int_Xferred    )
+    i2_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i3_l = IntKiBuf( Int_Xferred    )
+    i3_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%FFAvgData)) DEALLOCATE(OutData%FFAvgData)
+    ALLOCATE(OutData%FFAvgData(i1_l:i1_u,i2_l:i2_u,i3_l:i3_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%FFAvgData.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i3 = LBOUND(OutData%FFAvgData,3), UBOUND(OutData%FFAvgData,3)
+        DO i2 = LBOUND(OutData%FFAvgData,2), UBOUND(OutData%FFAvgData,2)
+          DO i1 = LBOUND(OutData%FFAvgData,1), UBOUND(OutData%FFAvgData,1)
+            OutData%FFAvgData(i1,i2,i3) = REAL(ReKiBuf(Re_Xferred), SiKi)
+            Re_Xferred = Re_Xferred + 1
+          END DO
+        END DO
+      END DO
+  END IF
     OutData%FFDTime = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
     OutData%FFRate = ReKiBuf(Re_Xferred)
@@ -705,6 +807,10 @@ ENDIF
     Re_Xferred = Re_Xferred + 1
     OutData%Z0 = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
+    OutData%BoxExceedAllowF = TRANSFER(IntKiBuf(Int_Xferred), OutData%BoxExceedAllowF)
+    Int_Xferred = Int_Xferred + 1
+    OutData%BoxExceedAllowIdx = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE IfW_FFWind_UnPackParam
 
 END MODULE IfW_FFWind_Base_Types

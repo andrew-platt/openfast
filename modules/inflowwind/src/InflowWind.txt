@@ -176,8 +176,6 @@ typedef  ^                       ^                 IntKi             NumOuts    
 typedef  ^                       ^                 OutParmType       OutParam          {:}   -     -     "Names and units (and other characteristics) of all requested output parameters" -
 typedef  ^                       ^                 IntKi             OutParamLinIndx  {:}{:} -     -     "Index into WriteOutput for WindViXYZ in linearization analysis" -
 typedef  ^                       ^          lidar_ParameterType      lidar             -     -     -     "Lidar parameter data"                                       -
-typedef  ^                       ^                 IntKi             BoxExceedAllowIdx    -  -     -     "Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim)" -
-typedef  ^                       ^                 LOGICAL           BoxExceedAllowF      -  -     -     "Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim)" -
 
 
 # ..... Inputs ....................................................................................................................

@@ -188,8 +188,6 @@ IMPLICIT NONE
     TYPE(OutParmType) , DIMENSION(:), ALLOCATABLE  :: OutParam      !< Names and units (and other characteristics) of all requested output parameters [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: OutParamLinIndx      !< Index into WriteOutput for WindViXYZ in linearization analysis [-]
     TYPE(Lidar_ParameterType)  :: lidar      !< Lidar parameter data [-]
-    INTEGER(IntKi)  :: BoxExceedAllowIdx      !< Extrapolate winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
-    LOGICAL  :: BoxExceedAllowF      !< Flag to allow Extrapolation winds outside box starting at this index (for OLAF wakes and LidarSim) [-]
   END TYPE InflowWind_ParameterType
 ! =======================
 ! =========  InflowWind_InputType  =======
@@ -3288,8 +3286,6 @@ ENDIF
       CALL Lidar_CopyParam( SrcParamData%lidar, DstParamData%lidar, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
-    DstParamData%BoxExceedAllowIdx = SrcParamData%BoxExceedAllowIdx
-    DstParamData%BoxExceedAllowF = SrcParamData%BoxExceedAllowF
  END SUBROUTINE InflowWind_CopyParam
 
  SUBROUTINE InflowWind_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -3531,8 +3527,6 @@ ENDIF
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
-      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowIdx
-      Int_BufSz  = Int_BufSz  + 1  ! BoxExceedAllowF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -3895,10 +3889,6 @@ ENDIF
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
-    IntKiBuf(Int_Xferred) = InData%BoxExceedAllowIdx
-    Int_Xferred = Int_Xferred + 1
-    IntKiBuf(Int_Xferred) = TRANSFER(InData%BoxExceedAllowF, IntKiBuf(1))
-    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE InflowWind_PackParam
 
  SUBROUTINE InflowWind_UnPackParam( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -4382,10 +4372,6 @@ ENDIF
       IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
-    OutData%BoxExceedAllowIdx = IntKiBuf(Int_Xferred)
-    Int_Xferred = Int_Xferred + 1
-    OutData%BoxExceedAllowF = TRANSFER(IntKiBuf(Int_Xferred), OutData%BoxExceedAllowF)
-    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE InflowWind_UnPackParam
 
  SUBROUTINE InflowWind_CopyInput( SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg )
