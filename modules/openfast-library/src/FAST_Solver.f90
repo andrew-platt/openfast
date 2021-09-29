@@ -300,8 +300,10 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD
          do j=1,size(y_SrvD%NStC)
             IF ( ALLOCATED(y_SrvD%NStC(j)%Mesh) ) THEN
                IF (y_SrvD%NStC(j)%Mesh(1)%Committed) THEN      ! size 1 only for NStC
-                  CALL Transfer_Point_to_Point( y_SrvD%NStC(j)%Mesh(1), u_ED%NacelleLoads, MeshMapData%SrvD_P_2_ED_P_N(j), ErrStat2, ErrMsg2, u_SrvD%NStC(j)%Mesh(1), y_ED%NacelleMotion )
+                  CALL Transfer_Point_to_Point( y_SrvD%NStC(j)%Mesh(1), MeshMapData%u_ED_NacelleLoads, MeshMapData%SrvD_P_2_ED_P_N(j), ErrStat2, ErrMsg2, u_SrvD%NStC(j)%Mesh(1), y_ED%NacelleMotion )
                      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat, ErrMsg,RoutineName//':u_ED%NacelleLoads' )
+                  u_ED%NacelleLoads%Force  = u_ED%NacelleLoads%Force +  MeshMapData%u_ED_NacelleLoads%Force
+                  u_ED%NacelleLoads%Moment = u_ED%NacelleLoads%Moment + MeshMapData%u_ED_NacelleLoads%Moment
                ENDIF
             END IF
          enddo
