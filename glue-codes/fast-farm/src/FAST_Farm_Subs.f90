@@ -2410,21 +2410,77 @@ end subroutine FARM_End
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine intializes all the ground/fixed lidar installations in the farm
 subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
-   type(All_FastFarm_Data),  intent(inout) :: farm                            !< FAST.Farm data
-   integer(IntKi),           intent(  out) :: ErrStat                         !< Error status
-   character(*),             intent(  out) :: ErrMsg                          !< Error message
-   character(*),   parameter               :: RoutineName = 'Farm_InitLidar'
-   type(LidarSim_InitInputType)            :: LidSim_InitInp
-   type(LidarSim_InitOutputType)           :: LidSim_InitOut
-   integer(intKi)                          :: NumLid                          ! loop counter for lidar instance
-   integer(intKi)                          :: ErrStat2                        ! Temporary Error status
-   character(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
+   type(All_FastFarm_Data),   intent(inout) :: farm                           !< FAST.Farm data
+   integer(IntKi),            intent(  out) :: ErrStat                        !< Error status
+   character(*),              intent(  out) :: ErrMsg                         !< Error message
+   character(*),   parameter                :: RoutineName = 'Farm_InitLidar'
+   type(LidarSim_InitInputType)             :: LidSim_InitInp
+   type(LidarSim_InitOutputType)            :: LidSim_InitOut
+   integer(intKi)                           :: iLid                           ! loop counter for lidar instance
+   integer(intKi)                           :: ErrStat2                       ! Temporary Error status
+   character(ErrMsgLen)                     :: ErrMsg2                        ! Temporary Error message
 
    ErrStat = ErrID_None
    ErrMsg = ""
 
+   if (farm%p%NumLidar < 1_IntKi) return;
+
+   ALLOCATE(farm%LidSim(farm%p%NumLidar),STAT=ErrStat2)
+   if (ErrStat2 /= 0) then
+      CALL SetErrStat( ErrID_Fatal, 'Could not allocate memory for farm level LidarSim data', ErrStat, ErrMsg, RoutineName )
+      return
+   end if
+
    call WrScr(" --------- in FARM_InitLidar, to initiailze ground/fixed lidar installations using LidarSim ------- ")
 
+   ! initialize each lidar instance
+   do iLid=1,farm%p%NumLidar
+      !  Position and orientation info (orientation is identity)
+      LidSim_InitInp%LidarRefPosition(1:3)      =  farm%p%Ldr_Position(1:3,iLid)
+      call Eye( LidSim_InitInp%LidarRefOrientation(1:3,1:3), ErrStat2, ErrMsg2 );   if (Failed())  return;
+      LidSim_InitInp%RootName       =  TRIM(farm%p%OutFileRoot)//'.FarmLidSim'//trim(num2LStr(iLid))
+      LidSim_InitInp%InputInitFile  =  trim(farm%p%Ldr_InFile(iLid))
+      LidSim_InitInp%DT             =  farm%p%DT_LOW
+
+      ! allocate LidarSim inputs (assuming size 2 for linear interpolation/extrapolation... )
+      ALLOCATE( farm%LidSim(iLid)%u( 2 ), farm%LidSim(iLid)%InputTimes( 2 ), STAT = ErrStat2 )
+      IF (ErrStat2 /= 0) THEN
+         ErrStat2 =  ErrID_Fatal
+         ErrMsg2  =  "Error allocating LidSimn%Input and LidSim%InputTimes."
+         if (Failed())  return
+      END IF
+
+      CALL LidarSim_Init( LidSim_InitInp, farm%LidSim(iLid)%u(1), farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+                 farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, farm%p%DT_LOW, LidSim_InitOut, ErrStat2, ErrMsg2 )
+      if (Failed())  return
+
+      ! mark as initialized
+      farm%LidSim(iLid)%IsInitialized = .TRUE.
+
+      ! Copy LidarSim inputs over into the 2nd entry of the input array, to allow the first extrapolation in FARM_LidSim_Increment
+      call LidarSim_CopyInput (farm%LidSim(iLid)%u(1),  farm%LidSim(iLid)%u(2),  MESH_NEWCOPY, Errstat2, ErrMsg2)
+      if (Failed())  return
+      farm%LidSim(iLid)%InputTimes(2) = -0.1_DbKi
+
+      !  NOTE: number of wind points each instance will request is stored in
+      !        farm%LidSim(iLid)%y%LidarMeasMesh%Nnodes
+   enddo
+
+   ! get version info
+   farm%p%Module_Ver(ModuleFF_LidSim) = LidSim_InitOut%Ver
+
+   call Cleanup()
+
+contains
+   logical function Failed()
+      CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+      Failed = ErrStat >= AbortErrLev
+      if (Failed) call Cleanup()
+   end function Failed
+   subroutine Cleanup()
+      call LidarSim_DestroyInitInput(  LidSim_InitInp, ErrStat2, ErrMsg2 )
+      call LidarSim_DestroyInitOutput( LidSim_InitOut, ErrStat2, ErrMsg2 )
+   end subroutine Cleanup
 end subroutine Farm_InitLidar
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine moves a farm-level MoorDyn simulation one step forward, to catch up with FWrap_Increment
