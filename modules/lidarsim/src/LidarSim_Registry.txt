@@ -14,6 +14,7 @@ typedef  LidarSim/LidarSim InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr
 typedef  ^                 InitOutputType    CHARACTER(ChanLen)   WriteOutputUnt          :  -        -  "Units of output-to-file channels"   -
 typedef  ^                 InitOutputType    ReKi                 UnifWind_Xoffset_URef   -  -        -  "URef for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" m/s
 typedef  ^                 InitOutputType    LOGICAL              UnifWind_Xoffset_URefF  -  .false.  -  "Flag for using input file URef instead of IfW values for calculating uniform wind. For testing purposes only" -
+typedef  ^                 InitOutputType    ProgDesc             Ver                     -  ""       -  "this module's name, version, and date" -
 
  ..... LidarSim_OutputType data .......................................................................................................
 typedef  LidarSim/LidarSim OutputType     ReKi     WriteOutput          :   -   -   "Array with values to output to file"   -

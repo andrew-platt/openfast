@@ -7,6 +7,8 @@ MODULE LidarSim
    IMPLICIT NONE
    PRIVATE
 
+   type(ProgDesc), parameter   :: LidarSim_ProgDesc = ProgDesc( 'LidarSim', 'v1.0', '6 Oct 2021' )
+
    PUBLIC                      ::  LidarSim_Init
    PUBLIC                      ::  LidarSim_CalcOutput
    PUBLIC                      ::  LidarSim_End
@@ -58,6 +60,14 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
     ErrStat        =  0
     ErrMsg         =  ""  
     
+    ! Initialize the NWTC Subroutine Library
+    CALL NWTC_Init( )
+
+    ! Display the module information
+    CALL DispNVD( LidarSim_ProgDesc )
+    InitOutData%Ver = LidarSim_ProgDesc
+
+    ! Filename stuff
     RootFileName  = InitInp%RootName
     IF (LEN_TRIM(RootFileName) == 0) CALL GetRoot( InitInp%InputInitFile, RootFileName )
 

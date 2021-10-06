@@ -1991,6 +1991,11 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_IceD )))
    END IF
 
+   IF ( p_FAST%CompLidar == Module_LidSim ) THEN
+      y_FAST%Module_Ver( Module_LidSim )   = Init%OutData_LidSim%Ver
+      y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_LidSim )))
+   END IF
+
    !......................................................
    ! Set the number of output columns from each module
    !......................................................
@@ -3791,7 +3796,7 @@ SUBROUTINE FAST_WrSum( p_FAST, y_FAST, MeshMapData, ErrStat, ErrMsg )
    IF ( p_FAST%CompIce /= Module_IceD ) DescStr = TRIM(DescStr)//NotUsedTxt
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
-   DescStr = GetNVD( y_FAST%Module_Ver( Module_IceD ) )
+   DescStr = GetNVD( y_FAST%Module_Ver( Module_LidSim ) )
    IF ( p_FAST%CompLidar == Module_LidSim ) then
       if (p_FAST%LidarMountLocation == LidarMount_Nacelle ) DescStr= TRIM( DescStr )//' (mounted on nacelle)'
       if (p_FAST%LidarMountLocation == LidarMount_Hub     ) DescStr= TRIM( DescStr )//' (mounted on hub)'
