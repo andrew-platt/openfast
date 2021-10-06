@@ -16,6 +16,7 @@ usefrom FASTWrapper_Registry.txt
 usefrom WakeDynamics_Registry.txt
 usefrom AWAE_Registry.txt
 usefrom SuperController_Registry.txt
+usefrom LidarSim_Registry.txt
 
 param	FAST_Farm/Farm	-	INTEGER	NumFFModules	-	4	-	"The number of modules available in FAST.Farm"	-
 param	^	-	INTEGER	ModuleFF_None	  -	0	-	"No module selected"	-
@@ -23,6 +24,7 @@ param	^	-	INTEGER	ModuleFF_SC	  -	1	-	"Super Controller"	-
 param	^	-	INTEGER	ModuleFF_FWrap  -	2	-	"FAST Wrapper"	-
 param	^	-	INTEGER	ModuleFF_WD	  -	3	-	"Wake Dynamics"	-
 param	^	-	INTEGER	ModuleFF_AWAE	  -	4	-	"Ambient Wind and Array Effects"	-
+param	^	-	INTEGER	ModuleFF_LidSim	 -	5	-	"LidarSim module for lidar"	-
 # ..... Parameters ................................................................................................................
 typedef  FAST_Farm/Farm  ParameterType         DbKi            DT_low          -    - - "Time step for low-resolution wind data input files; will be used as the global FAST.Farm time step" seconds
 typedef  ^               ParameterType         DbKi            DT_high         -    - - "High-resolution time step"  seconds
@@ -36,6 +38,9 @@ typedef  ^               ParameterType         ReKi            WT_Position   {:}
 typedef  ^               ParameterType         CHARACTER(1024) WT_FASTInFile {:}    - - "Name of input file for each turbine" -
 typedef  ^               ParameterType         CHARACTER(1024) FTitle          -    - - "The description line from the primary FAST.Farm input file" -
 typedef  ^               ParameterType         CHARACTER(1024) OutFileRoot     -    - - "The root name derived from the primary FAST.Farm input file" -
+typedef  ^               ParameterType         IntKi           NumLidar        -    - - "Number of ground/fixed lidar locations using LidarSim module {0: none}" -
+typedef  ^               ParameterType         ReKi            Ldr_Position  {:}{:} - - "X-Y-Z position of ground/fixed lidar locations; index 1 = XYZ; index 2 = turbine number" meters
+typedef  ^               ParameterType         CHARACTER(1024) Ldr_InFile    {:}    - - "Name of input file for each Lidar instance" -
 typedef  ^               ParameterType         INTEGER         n_ChkptTime     -    - - "Number of time steps between writing checkpoint files"	-
 typedef  ^               ParameterType         DbKi            TStart          -    - - "Time to begin tabular output" s
 typedef  ^               ParameterType         IntKi           n_TMax          -    - - "Number of the time step of TMax (the end time of the simulation)" -
@@ -122,6 +127,17 @@ typedef    ^    ^                 DbKi                      utimes       {1}  - 
 typedef    ^    ^                 SC_OutputType             y             -   -         -   "System outputs"
 typedef    ^    ^                 SC_MiscVarType            m             -   -         -   "Misc/optimization variables"
 typedef    ^    ^                 logical                   IsInitialized -   .FALSE.   -   "Has SC_Init been called"
+# ..... LidarSim data .......................................................................................................
+typedef    ^    LidSim_Data       LidarSim_ContinuousStateType  x             -   -         -   "Continuous states" -
+typedef    ^    ^                 LidarSim_DiscreteStateType    xd            -   -         -   "Discrete states" -
+typedef    ^    ^                 LidarSim_ConstraintStateType  z             -   -         -   "Constraint states" -
+typedef    ^    ^                 LidarSim_OtherStateType       OtherSt       -   -         -   "Other states" -
+typedef    ^    ^                 LidarSim_ParameterType        p             -   -         -   "Parameters" -
+typedef    ^    ^                 LidarSim_InputType            u            {:}  -         -   "System inputs" -
+typedef    ^    ^                 DbKi                          InputTimes   {:}  -         -   "Current time" s
+typedef    ^    ^                 LidarSim_OutputType           y             -   -         -   "System outputs" -
+typedef    ^    ^                 LidarSim_MiscVarType          m             -   -         -   "Misc/optimization variables" -
+typedef    ^    ^                 logical                       IsInitialized -   .FALSE.   -   "Has LidSim_Init been called" -
 # ..... All submodules' variables.................................................................................................
 typedef    ^   All_FastFarm_Data  Farm_ParameterType        p          -   -   -   "FAST.Farm parameter data" -
 typedef    ^   All_FastFarm_Data  Farm_MiscVarType          m          -   -   -   "FAST.Farm misc var data" -
@@ -129,5 +145,6 @@ typedef    ^   All_FastFarm_Data  FASTWrapper_Data          FWrap     {:}  -   -
 typedef    ^   All_FastFarm_Data  WakeDynamics_Data         WD        {:}  -   -   "WakeDynamics (WD) data" -
 typedef    ^   All_FastFarm_Data  AWAE_Data                 AWAE       -   -   -   "Ambient Wind & Array Effects (AWAE) data" -
 typedef    ^   All_FastFarm_Data  SC_Data                   SC         -   -   -   "Super Controller (SC) data" -
+typedef    ^   All_FastFarm_Data  LidSim_Data               LidSim     {:} -   -   "Data for LidarSim module"   -
 # ..... FAST.Farm data ................................................................................................................
 #

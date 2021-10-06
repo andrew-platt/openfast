@@ -317,6 +317,20 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
          RETURN
       END IF   
 
+   !...............................................................................................................................
+   ! step 4.6: initialize ground/fixed lidar units with LidarSim (if applicable)
+   !...............................................................................................................................
+
+   if (farm%p%NumLidar > 0_IntKi) then
+      call Farm_InitLidar( farm, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         IF (ErrStat >= AbortErrLev) THEN
+            CALL Cleanup()
+            RETURN
+         END IF
+   endif
+
+
    !...............................................................................................................................  
    ! step 5: Open output file (or set up output file handling)      
    !...............................................................................................................................  
@@ -807,6 +821,52 @@ SUBROUTINE Farm_ReadPrimaryFile( InputFile, p, WD_InitInp, AWAE_InitInp, SC_Init
    end do
       
       
+   !---------------------- GROUND/FIXED LIDAR ----------------------------------------
+   CALL ReadCom( UnIn, InputFile, 'Section Header: Ground/Fixed Lidar', ErrStat2, ErrMsg2, UnEc )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      if ( ErrStat >= AbortErrLev ) then
+         call cleanup()
+         RETURN
+      end if
+
+
+      ! NumLidar - Number of lidar units (-) [>=0]:
+   CALL ReadVar( UnIn, InputFile, p%NumLidar, "NumLidar", "Number of ground/fixed lidar units (simulated with LidarSim) (-) [>=0]", ErrStat2, ErrMsg2, UnEc)
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      if ( ErrStat >= AbortErrLev ) then
+         call cleanup()
+         RETURN
+      end if
+
+   CALL ReadCom( UnIn, InputFile, 'Section Header: Ldr column names', ErrStat2, ErrMsg2, UnEc )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   CALL ReadCom( UnIn, InputFile, 'Section Header: Ldr column units', ErrStat2, ErrMsg2, UnEc )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+
+   call AllocAry( p%Ldr_Position, 3, p%NumLidar, 'Ldr_Position',   ErrStat2, ErrMsg2);  CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call AllocAry( p%Ldr_InFile,  p%NumLidar, 'Ldr_InFile', ErrStat2, ErrMsg2);  CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+!   call AllocAry( AWAE_InitInp%WT_Position, 3, p%NumTurbines, 'AWAE_InitInp%WT_Position', ErrStat2, ErrMsg2);  CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+!      if ( ErrStat >= AbortErrLev ) then
+!         call cleanup()
+!         RETURN
+!      end if
+
+      ! Ldr_Position (Ldr_X, Ldr_Y, Ldr_Z) and Ldr_InFile
+   do i=1,p%NumLidar
+      READ (UnIn, *, IOSTAT=IOS) p%Ldr_Position(:,i), p%Ldr_InFile(i)
+      CALL CheckIOS ( IOS, InputFile, 'Lidar Columns', NumType, ErrStat2, ErrMsg2 )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      if ( ErrStat >= AbortErrLev ) then
+         call cleanup()
+         RETURN
+      end if
+      IF ( UnEc > 0 ) THEN
+         WRITE( UnEc, "(3(ES11.4e2,2X),'""',A,'""',T50,' - WT(',I5,')')" ) p%Ldr_Position(:,i), TRIM( p%Ldr_InFile(i) ), I
+      END IF
+      IF ( PathIsRelative( p%Ldr_InFile(i) ) ) p%Ldr_InFile(i) = TRIM(PriPath)//TRIM(p%Ldr_InFile(i))
+   end do
+
+
    !---------------------- WAKE DYNAMICS ---------------------------------------------
    CALL ReadCom( UnIn, InputFile, 'Section Header: Wake Dynamics', ErrStat2, ErrMsg2, UnEc )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1413,6 +1473,10 @@ SUBROUTINE Farm_ValidateInput( p, WD_InitInp, AWAE_InitInp, SC_InitInp, ErrStat,
       CALL SetErrStat(ErrID_Fatal,'C_Meander parameter must not be less than 1.',ErrStat,ErrMsg,RoutineName)
    END IF
          
+   !--- LIDAR  ---
+   if (p%NumLidar < 0_IntKi)  call SetErrStat(ErrID_Fatal,'Number of ground/fixed lidar installations must be >=0', ErrStat, ErrMsg, RoutineName )
+!FIXME: can I add checks that the lidars are actually on the same continent?
+
    !--- OUTPUT ---
    IF ( p%n_ChkptTime < 1_IntKi   ) CALL SetErrStat( ErrID_Fatal, 'ChkptTime must be greater than 0 seconds.', ErrStat, ErrMsg, RoutineName )
    IF (p%TStart < 0.0_ReKi) CALL SetErrStat(ErrID_Fatal,'TStart must not be negative.',ErrStat,ErrMsg,RoutineName)
@@ -2265,6 +2329,7 @@ subroutine FARM_End(farm, ErrStat, ErrMsg)
    CHARACTER(*),             INTENT(  OUT) :: ErrMsg                          !< Error message
 
    INTEGER(IntKi)                          :: nt                    
+   INTEGER(IntKi)                          :: iLid                            ! Counter of lidar instance
    INTEGER(IntKi)                          :: ErrStat2                        ! Temporary Error status
    CHARACTER(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
    CHARACTER(*),   PARAMETER               :: RoutineName = 'FARM_End'
@@ -2323,12 +2388,60 @@ subroutine FARM_End(farm, ErrStat, ErrMsg)
       
    end if   
    
+      !--------------
+      ! 4.6 End each instance of LidarSim
+   if (farm%p%NumLidar > 0_IntKi) then
+      do iLid = 1,farm%p%NumLidar
+         if (farm%LidSim(iLid)%IsInitialized) then
+            CALL LidarSim_End( farm%LidSim(iLid)%u(1), farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+                            farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, ErrStat2, ErrMsg2 )
+            call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Lidar'//trim(num2lstr(iLid))//':'//RoutineName)
+            farm%LidSim(iLid)%IsInitialized = .FALSE.
+         end if
+      end do
+   end if
+   
    !.......................................................................................
    ! close output file
    !.......................................................................................
    call Farm_EndOutput( farm, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'T'//trim(num2lstr(nt))//':'//RoutineName)
 end subroutine FARM_End
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine intializes all the ground/fixed lidar installations in the farm
+subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
+   type(All_FastFarm_Data),  intent(inout) :: farm                            !< FAST.Farm data
+   integer(IntKi),           intent(  out) :: ErrStat                         !< Error status
+   character(*),             intent(  out) :: ErrMsg                          !< Error message
+   character(*),   parameter               :: RoutineName = 'Farm_InitLidar'
+   type(LidarSim_InitInputType)            :: LidSim_InitInp
+   type(LidarSim_InitOutputType)           :: LidSim_InitOut
+   integer(intKi)                          :: NumLid                          ! loop counter for lidar instance
+   integer(intKi)                          :: ErrStat2                        ! Temporary Error status
+   character(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
+
+   ErrStat = ErrID_None
+   ErrMsg = ""
+
+   call WrScr(" --------- in FARM_InitLidar, to initiailze ground/fixed lidar installations using LidarSim ------- ")
+
+end subroutine Farm_InitLidar
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine moves a farm-level MoorDyn simulation one step forward, to catch up with FWrap_Increment
+subroutine FARM_Lidar_Increment(t, n, farm, ErrStat, ErrMsg)
+   real(DbKi),               intent(in   ) :: t                               !< Current simulation time in seconds
+   integer(IntKi),           intent(in   ) :: n                               !< Current step of the simulation in FARM MoorDyn terms
+   type(All_FastFarm_Data),  intent(inout) :: farm                            !< FAST.Farm data
+   integer(IntKi),           intent(  out) :: ErrStat                         !< Error status
+   character(*),             intent(  out) :: ErrMsg                          !< Error message
+   character(*),   parameter               :: RoutineName = 'FARM_Lidar_Increment'
+   integer(intKi)                          :: ErrStat2                        ! Temporary Error status
+   character(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
+
+   ErrStat = ErrID_None
+   ErrMsg = ""
+
+end subroutine FARM_Lidar_Increment
 !----------------------------------------------------------------------------------------------------------------------------------
 SUBROUTINE Transfer_FAST_to_WD(farm)
    type(All_FastFarm_Data),  INTENT(INOUT) :: farm                            !< FAST.Farm data  
