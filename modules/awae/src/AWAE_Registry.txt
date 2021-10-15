@@ -72,6 +72,7 @@ typedef   ^ InitInputType  AWAE_InputFileType InputFileData    -  - -   "FAST.Fa
 typedef   ^ InitInputType  IntKi              n_high_low       -  - -   "Number of high-resolution time steps per low" -
 typedef   ^ InitInputType  IntKi              NumDT            -  - -   "Number of low-resolution (FAST.Farm driver/glue code) time steps" -
 typedef  ^  InitInputType  CHARACTER(1024)    OutFileRoot      -  - -   "The root name derived from the primary FAST.Farm input file" -
+typedef   ^ InitInputType  IntKi              Ldr_NumPts       -  0 -   "Total number of points requested from all LidarSim instances" -
 
 
 # Define outputs from the initialization routine here:
@@ -193,6 +194,7 @@ typedef  ^  ParameterType  CHARACTER(1024)  OutFileRoot        -  - -   "The roo
 typedef  ^  ParameterType  CHARACTER(1024)  OutFileVTKRoot     -  - -   "The root name for VTK outputs" -
 typedef  ^  ParameterType  IntKi            VTK_tWidth         -  - -   "Number of characters for VTK timestamp outputs" -
 #typedef   ^ ParameterType  OutParmType      OutParam          {:} - -   "Names and units (and other characteristics) of all requested output parameters"      -
+typedef  ^  ParameterType  IntKi            Ldr_NumPts         -  - -   "Total number of points requested from all LidarSim instances" -
 
 
 # ..... Outputs ....................................................................................................................
@@ -201,6 +203,7 @@ typedef   ^ OutputType     AWAE_HighWindGrid Vdist_High   {:}     -      -      
 typedef   ^ OutputType     ReKi       V_plane      {:}{:}{:}              -      -      "Advection, deflection, and meandering velocity of wake planes for each turbine"      m/s
 typedef   ^ OutputType     ReKi       TI_amb       {:}                    -      -      "Ambient turbulence intensity of wind at rotor disk for each turbine"      -
 typedef   ^ OutputType     ReKi       Vx_wind_disk {:}                    -      -      "Rotor-disk-averaged ambient wind speed, normal to disk, for each turbine"      m/s
+typedef   ^ OutputType     ReKi       Ldr_Vel      {:}{:}                 -      -      "Lidar measured velocity -- requested by LidarSim instances at FARM"      m/s
 
 
 # ..... Inputs ...........................................................................................................
@@ -210,4 +213,5 @@ typedef   ^ InputType      ReKi       p_plane      {:}{:}{:}              -     
 typedef   ^ InputType      ReKi       Vx_wake      {:}{:}{:}              -      -      "Axial wake velocity deficit at wake planes, distributed radially, for each turbine"      m/s
 typedef   ^ InputType      ReKi       Vr_wake      {:}{:}{:}              -      -      "Radial wake velocity deficit at wake planes, distributed radially, for each turbine"      m/s
 typedef   ^ InputType      ReKi       D_wake       {:}{:}                 -      -      "Wake diameters at wake planes for each turbine"     m
+typedef   ^ InputType      ReKi       Ldr_MeasPos  {:}{:}                 -      -      "LidarSim measurement requested positions -- requested by LidarSim instances at FARM"     m
 

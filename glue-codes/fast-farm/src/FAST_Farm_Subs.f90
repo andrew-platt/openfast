@@ -43,7 +43,7 @@ MODULE FAST_Farm_Subs
 
 
     
-   integer, parameter :: maxOutputPoints = 9
+   integer, parameter :: maxOutputPoints = 99
    
    CONTAINS
  
@@ -231,6 +231,20 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
       call SetErrStat(ErrID_Warn, "For efficiency, NumPlanes has been reduced to the number of time steps ("//TRIM(Num2LStr(WD_InitInput%InputFileData%NumPlanes))//").", ErrStat, ErrMsg, RoutineName )
    ENDIF
    
+   !...............................................................................................................................
+   ! step 2.5: initialize ground/fixed lidar units with LidarSim (if applicable)
+   !...............................................................................................................................
+
+   if (farm%p%NumLidar > 0_IntKi) then
+      call Farm_InitLidar( farm, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         IF (ErrStat >= AbortErrLev) THEN
+            CALL Cleanup()
+            RETURN
+         END IF
+   endif
+
+
    !...............................................................................................................................  
    ! step 3: initialize SC, AWAE, and WD (a, b, and c can be done in parallel)
    !...............................................................................................................................  
@@ -247,6 +261,11 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
    AWAE_InitInput%n_high_low                 = farm%p%n_high_low
    AWAE_InitInput%NumDT                      = farm%p%n_TMax
    AWAE_InitInput%OutFileRoot                = farm%p%OutFileRoot
+   if (allocated(farm%p%Ldr_WndPtRng)) then
+      AWAE_InitInput%Ldr_NumPts              = farm%p%Ldr_WndPtRng(2,size(farm%p%Ldr_WndPtRng,2))
+   else
+      AWAE_InitInput%Ldr_NumPts              = 0_IntKi
+   endif
    call AWAE_Init( AWAE_InitInput, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, farm%AWAE%OtherSt, farm%AWAE%y, &
                    farm%AWAE%m, farm%p%DT_low, AWAE_InitOutput, ErrStat2, ErrMsg2 )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -316,19 +335,6 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
          CALL Cleanup()
          RETURN
       END IF   
-
-   !...............................................................................................................................
-   ! step 4.6: initialize ground/fixed lidar units with LidarSim (if applicable)
-   !...............................................................................................................................
-
-   if (farm%p%NumLidar > 0_IntKi) then
-      call Farm_InitLidar( farm, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         IF (ErrStat >= AbortErrLev) THEN
-            CALL Cleanup()
-            RETURN
-         END IF
-   endif
 
 
    !...............................................................................................................................  
@@ -1710,6 +1716,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    CHARACTER(*),             INTENT(  OUT) :: ErrMsg                          !< Error message
 
    INTEGER(IntKi)                          :: nt                    
+   INTEGER(IntKi)                          :: iLid
    INTEGER(IntKi)                          :: ErrStat2                        ! Temporary Error status
    CHARACTER(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
    CHARACTER(*),   PARAMETER               :: RoutineName = 'FARM_InitialCO'
@@ -1817,10 +1824,11 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    if (ErrStat >= AbortErrLev) return
    
    !.......................................................................................
-   ! Transfer y_WD to u_AWAE
+   ! Transfer y_WD and y_Ldr to u_AWAE
    !.......................................................................................
    
    call Transfer_WD_to_AWAE(farm)
+   call Transfer_LidarSim_to_AWAE(farm)
    
    !.......................................................................................
    ! CALL AWAE_CO
@@ -1832,13 +1840,26 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    if (ErrStat >= AbortErrLev) return
    
    !.......................................................................................
-   ! Transfer y_AWAE to u_F and u_WD
+   ! Transfer y_AWAE to u_F, u_WD, and u_LidarSim
    !.......................................................................................
    
    call Transfer_AWAE_to_FAST(farm)              
    call Transfer_AWAE_to_WD(farm)   
+   call Transfer_AWAE_to_LidarSim(farm)
    
    !.......................................................................................
+   ! CALL LidarSim 
+   !.......................................................................................
+   if (farm%p%NumLidar > 0_IntKi) then
+      do iLid=1,farm%p%NumLidar
+         CALL LidarSim_CalcOutput( 0.0_DbKi, farm%LidSim(iLid)%u, farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+                    farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, ErrStat2, ErrMsg2 )
+            call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      enddo
+   endif
+   
+    !.......................................................................................
    ! Write Output to File
    !.......................................................................................
    
@@ -2236,6 +2257,7 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
    CHARACTER(*),             INTENT(  OUT) :: ErrMsg                          !< Error message
 
    INTEGER(IntKi)                          :: nt                    
+   INTEGER(IntKi)                          :: iLid
    INTEGER(IntKi)                          :: ErrStat2                        ! Temporary Error status
    CHARACTER(ErrMsgLen)                    :: ErrMsg2                         ! Temporary Error message
    CHARACTER(*),   PARAMETER               :: RoutineName = 'FARM_CalcOutput'
@@ -2245,7 +2267,14 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
    ErrMsg = ""
    
   ! tm1 = omp_get_wtime()
-   
+
+   !.......................................................................................
+   ! 0. transfer the LidarSim measurement mesh to AWAE.
+   ! NOTE:  this is technically transferring the last timesteps mesh data over.  we don't extrapolate
+   !        any mesh motion, nor does this mesh currently move, so this assumption is ok for now
+   !.......................................................................................
+   call Transfer_LidarSim_to_AWAE(farm)
+
    !.......................................................................................
    ! calculate module outputs and perform some input-output solves (steps 1. and 2. and 3. can be done in parallel,
    !  but be careful that step 3 doesn't modify the inputs to steps 1 or 2)
@@ -2299,11 +2328,24 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
       !--------------------
-      ! 2. Transfer y_AWAE to u_F  and u_WD   
+      ! 2. Transfer y_AWAE to u_F, u_WD, and LidarSim
    call Transfer_AWAE_to_FAST(farm)      
    call Transfer_AWAE_to_WD(farm)   
+   call Transfer_AWAE_to_LidarSim(farm)
    
-   
+   !.......................................................................................
+   ! call LidarSim
+   !.......................................................................................
+   if (farm%p%NumLidar > 0_IntKi) then
+      do iLid=1,farm%p%NumLidar
+         CALL LidarSim_CalcOutput( t, farm%LidSim(iLid)%u, farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+                    farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, ErrStat2, ErrMsg2 )
+            call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      enddo
+   endif
+  
+
    !.......................................................................................
    ! Write Output to File
    !.......................................................................................
@@ -2393,7 +2435,7 @@ subroutine FARM_End(farm, ErrStat, ErrMsg)
    if (farm%p%NumLidar > 0_IntKi) then
       do iLid = 1,farm%p%NumLidar
          if (farm%LidSim(iLid)%IsInitialized) then
-            CALL LidarSim_End( farm%LidSim(iLid)%u(1), farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+            CALL LidarSim_End( farm%LidSim(iLid)%u, farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
                             farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, ErrStat2, ErrMsg2 )
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Lidar'//trim(num2lstr(iLid))//':'//RoutineName)
             farm%LidSim(iLid)%IsInitialized = .FALSE.
@@ -2431,6 +2473,10 @@ subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
       return
    end if
 
+   ! Store start and end indices for each LidarSim instance
+   call AllocAry(farm%p%Ldr_WndPtRng,2_IntKi,farm%p%NumLidar,'farm%p%Ldr_WndPtRng',ErrStat2,ErrMsg2)
+   if (Failed())  return
+
    call WrScr(" --------- in FARM_InitLidar, to initiailze ground/fixed lidar installations using LidarSim ------- ")
 
    ! initialize each lidar instance
@@ -2440,30 +2486,24 @@ subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
       call Eye( LidSim_InitInp%LidarRefOrientation(1:3,1:3), ErrStat2, ErrMsg2 );   if (Failed())  return;
       LidSim_InitInp%RootName       =  TRIM(farm%p%OutFileRoot)//'.FarmLidSim'//trim(num2LStr(iLid))
       LidSim_InitInp%InputInitFile  =  trim(farm%p%Ldr_InFile(iLid))
-      LidSim_InitInp%DT             =  farm%p%DT_LOW
+      LidSim_InitInp%DT             =  farm%p%DT_high
 
-      ! allocate LidarSim inputs (assuming size 2 for linear interpolation/extrapolation... )
-      ALLOCATE( farm%LidSim(iLid)%u( 2 ), farm%LidSim(iLid)%InputTimes( 2 ), STAT = ErrStat2 )
-      IF (ErrStat2 /= 0) THEN
-         ErrStat2 =  ErrID_Fatal
-         ErrMsg2  =  "Error allocating LidSimn%Input and LidSim%InputTimes."
-         if (Failed())  return
-      END IF
-
-      CALL LidarSim_Init( LidSim_InitInp, farm%LidSim(iLid)%u(1), farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
+      CALL LidarSim_Init( LidSim_InitInp, farm%LidSim(iLid)%u, farm%LidSim(iLid)%p, farm%LidSim(iLid)%x, farm%LidSim(iLid)%xd, farm%LidSim(iLid)%z, &
                  farm%LidSim(iLid)%OtherSt, farm%LidSim(iLid)%y, farm%LidSim(iLid)%m, farm%p%DT_LOW, LidSim_InitOut, ErrStat2, ErrMsg2 )
       if (Failed())  return
 
       ! mark as initialized
       farm%LidSim(iLid)%IsInitialized = .TRUE.
 
-      ! Copy LidarSim inputs over into the 2nd entry of the input array, to allow the first extrapolation in FARM_LidSim_Increment
-      call LidarSim_CopyInput (farm%LidSim(iLid)%u(1),  farm%LidSim(iLid)%u(2),  MESH_NEWCOPY, Errstat2, ErrMsg2)
-      if (Failed())  return
-      farm%LidSim(iLid)%InputTimes(2) = -0.1_DbKi
-
-      !  NOTE: number of wind points each instance will request is stored in
-      !        farm%LidSim(iLid)%y%LidarMeasMesh%Nnodes
+      ! Store indices for locations of wind data requested from AWAE module
+      !  -- Start index
+      if (iLid == 1_IntKi) then
+         farm%p%Ldr_WndPtRng(1,iLid) = 1_IntKi
+      else
+         farm%p%Ldr_WndPtRng(1,iLid) = farm%p%Ldr_WndPtRng(2,iLid-1)+1
+      endif
+      !  -- End index (inclusive)
+      farm%p%Ldr_WndPtRng(2,iLid) = farm%p%Ldr_WndPtRng(1,iLid) - 1_IntKi + farm%LidSim(iLid)%y%LidarMeasMesh%Nnodes
    enddo
 
    ! get version info
@@ -2554,6 +2594,46 @@ SUBROUTINE Transfer_WD_to_AWAE(farm)
    END DO
    
 END SUBROUTINE Transfer_WD_to_AWAE
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE Transfer_LidarSim_to_AWAE(farm)
+   type(All_FastFarm_Data),  INTENT(INOUT) :: farm                            !< FAST.Farm data  
+   integer(intKi)    :: iLid
+   integer(IntKi)    :: Idx
+   integer(IntKi)    :: NStart,NEnd
+
+   if (farm%p%NumLidar <= 0_IntKi) return;
+
+   do iLid = 1,farm%p%NumLidar
+      NStart = farm%p%Ldr_WndPtRng(1,iLid)       ! first wind point for this lidar instance
+      NEnd   = farm%p%Ldr_WndPtRng(2,iLid)       ! last  wind point for this lidar instance
+      ! Some quick error checks during dev -- remove when done
+      if ((NEnd-NStart+1) /= farm%LidSim(iLid)%y%LidarMeasMesh%NNodes)  call WrScr('FATAL: Lidar measure points and AWAE lidar input mismatch: LidarMesh '//trim(Num2LStr(iLid)))
+      if (NEnd > size(farm%AWAE%u%Ldr_MeasPos,DIM=2))                   call WrScr('FATAL: Lidar measure points and AWAE lidar input mismatch: input size')
+      do Idx=1,farm%LidSim(iLid)%y%LidarMeasMesh%NNodes
+         farm%AWAE%u%Ldr_MeasPos(1:3,NStart+Idx-1) = farm%LidSim(iLid)%y%LidarMeasMesh%Position(1:3,Idx) + farm%LidSim(iLid)%y%LidarMeasMesh%TranslationDisp(1:3,Idx)
+      enddo
+   enddo
+END SUBROUTINE Transfer_LidarSim_to_AWAE
+!----------------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE Transfer_AWAE_to_LidarSim(farm)
+   type(All_FastFarm_Data),  INTENT(INOUT) :: farm                            !< FAST.Farm data  
+   integer(intKi)    :: iLid
+   integer(IntKi)    :: Idx
+   integer(IntKi)    :: NStart,NEnd
+
+   if (farm%p%NumLidar <= 0_IntKi) return;
+
+   do iLid = 1,farm%p%NumLidar
+      NStart = farm%p%Ldr_WndPtRng(1,iLid)       ! first wind point for this lidar instance
+      NEnd   = farm%p%Ldr_WndPtRng(2,iLid)       ! last  wind point for this lidar instance
+      ! Some quick error checks during dev -- remove when done
+      if ((NEnd-NStart+1) /= size(farm%LidSim(iLid)%u%WindVelocity,DIM=2))    call WrScr('FATAL: Lidar measure input points and AWAE lidar input mismatch: LidSim%u%WindVelocity '//trim(Num2LStr(iLid)))
+      if (NEnd > size(farm%AWAE%y%Ldr_Vel,DIM=2))                             call WrScr('FATAL: Lidar measure points and AWAE lidar output mismatch: output size')
+      do Idx=1,(NEnd-NStart+1)
+         farm%LidSim(iLid)%u%WindVelocity(1:3,Idx) = farm%AWAE%y%Ldr_Vel(1:3,NStart+Idx-1)
+      enddo
+   enddo
+END SUBROUTINE Transfer_AWAE_to_LidarSim
 !----------------------------------------------------------------------------------------------------------------------------------
 END MODULE FAST_Farm_Subs
 !**********************************************************************************************************************************

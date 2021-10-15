@@ -746,6 +746,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    p%n_high_low       = InitInp%n_high_low
    p%dt_low           = InitInp%InputFileData%dt_low
    p%NumDT            = InitInp%NumDT
+   p%Ldr_NumPts       = InitInp%Ldr_NumPts
    p%NOutDisWindXY    = InitInp%InputFileData%NOutDisWindXY
    p%NOutDisWindYZ    = InitInp%InputFileData%NOutDisWindYZ
    p%NOutDisWindXZ    = InitInp%InputFileData%NOutDisWindXZ
@@ -873,7 +874,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
 
          ! Initialize InflowWind
          IfW_InitInp%FixedWindFileRootName = .false.
-         IfW_InitInp%NumWindPoints         = p%NumGrid_low
+         IfW_InitInp%NumWindPoints         = p%NumGrid_low + p%Ldr_NumPts
       
          call InflowWind_Init( IfW_InitInp, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), Interval, IfW_InitOut, ErrStat2, ErrMsg2 )
             call SetErrStat ( errStat2, errMsg2, errStat, errMsg, RoutineName )
@@ -916,7 +917,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
 
          ! Initialize InflowWind for the low-resolution domain
          IfW_InitInp%FixedWindFileRootName = .true.
-         IfW_InitInp%NumWindPoints         = p%NumGrid_low
+         IfW_InitInp%NumWindPoints         = p%NumGrid_low + p%Ldr_NumPts
          IfW_InitInp%TurbineID             = 0
       
          call InflowWind_Init( IfW_InitInp, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), Interval, IfW_InitOut, ErrStat2, ErrMsg2 )
@@ -1008,6 +1009,8 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for u%Vr_wake.', errStat, errMsg, RoutineName )
    allocate ( u%D_wake    (0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 )
       if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for u%D_wake.', errStat, errMsg, RoutineName )
+   allocate ( u%Ldr_MeasPos(3,p%Ldr_NumPts), STAT=ErrStat2 )
+      if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for u%Ldr_MeasPos.', errStat, errMsg, RoutineName )
    if (errStat /= ErrID_None) return
 
 
@@ -1032,6 +1035,10 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    allocate ( y%TI_amb   (1:p%NumTurbines), STAT=ErrStat2 )
       if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for y%TI_amb.', errStat, errMsg, RoutineName )
    if (errStat /= ErrID_None) return
+
+   ! For farm level Lidar systems
+   allocate ( y%Ldr_Vel(3,p%Ldr_NumPts), STAT=ErrStat2 )
+      if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for u%Ldr_MeasVel.', errStat, errMsg, RoutineName )
 
       ! This next step is not strictly necessary
    y%V_plane       = 0.0_Reki

@@ -94,6 +94,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: n_high_low      !< Number of high-resolution time steps per low [-]
     INTEGER(IntKi)  :: NumDT      !< Number of low-resolution (FAST.Farm driver/glue code) time steps [-]
     CHARACTER(1024)  :: OutFileRoot      !< The root name derived from the primary FAST.Farm input file [-]
+    INTEGER(IntKi)  :: Ldr_NumPts = 0      !< Total number of points requested from all LidarSim instances [-]
   END TYPE AWAE_InitInputType
 ! =======================
 ! =========  AWAE_InitOutputType  =======
@@ -218,6 +219,7 @@ IMPLICIT NONE
     CHARACTER(1024)  :: OutFileRoot      !< The root name derived from the primary FAST.Farm input file [-]
     CHARACTER(1024)  :: OutFileVTKRoot      !< The root name for VTK outputs [-]
     INTEGER(IntKi)  :: VTK_tWidth      !< Number of characters for VTK timestamp outputs [-]
+    INTEGER(IntKi)  :: Ldr_NumPts      !< Total number of points requested from all LidarSim instances [-]
   END TYPE AWAE_ParameterType
 ! =======================
 ! =========  AWAE_OutputType  =======
@@ -226,6 +228,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: V_plane      !< Advection, deflection, and meandering velocity of wake planes for each turbine [m/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TI_amb      !< Ambient turbulence intensity of wind at rotor disk for each turbine [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Vx_wind_disk      !< Rotor-disk-averaged ambient wind speed, normal to disk, for each turbine [m/s]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Ldr_Vel      !< Lidar measured velocity -- requested by LidarSim instances at FARM [m/s]
   END TYPE AWAE_OutputType
 ! =======================
 ! =========  AWAE_InputType  =======
@@ -235,6 +238,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vx_wake      !< Axial wake velocity deficit at wake planes, distributed radially, for each turbine [m/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vr_wake      !< Radial wake velocity deficit at wake planes, distributed radially, for each turbine [m/s]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: D_wake      !< Wake diameters at wake planes for each turbine [m]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Ldr_MeasPos      !< LidarSim measurement requested positions -- requested by LidarSim instances at FARM [m]
   END TYPE AWAE_InputType
 ! =======================
 CONTAINS
@@ -1335,6 +1339,7 @@ ENDIF
     DstInitInputData%n_high_low = SrcInitInputData%n_high_low
     DstInitInputData%NumDT = SrcInitInputData%NumDT
     DstInitInputData%OutFileRoot = SrcInitInputData%OutFileRoot
+    DstInitInputData%Ldr_NumPts = SrcInitInputData%Ldr_NumPts
  END SUBROUTINE AWAE_CopyInitInput
 
  SUBROUTINE AWAE_DestroyInitInput( InitInputData, ErrStat, ErrMsg )
@@ -1405,6 +1410,7 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1  ! n_high_low
       Int_BufSz  = Int_BufSz  + 1  ! NumDT
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%OutFileRoot)  ! OutFileRoot
+      Int_BufSz  = Int_BufSz  + 1  ! Ldr_NumPts
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -1468,6 +1474,8 @@ ENDIF
       IntKiBuf(Int_Xferred) = ICHAR(InData%OutFileRoot(I:I), IntKi)
       Int_Xferred = Int_Xferred + 1
     END DO ! I
+    IntKiBuf(Int_Xferred) = InData%Ldr_NumPts
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_PackInitInput
 
  SUBROUTINE AWAE_UnPackInitInput( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -1544,6 +1552,8 @@ ENDIF
       OutData%OutFileRoot(I:I) = CHAR(IntKiBuf(Int_Xferred))
       Int_Xferred = Int_Xferred + 1
     END DO ! I
+    OutData%Ldr_NumPts = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_UnPackInitInput
 
  SUBROUTINE AWAE_CopyInitOutput( SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg )
@@ -5453,6 +5463,7 @@ ENDIF
     DstParamData%OutFileRoot = SrcParamData%OutFileRoot
     DstParamData%OutFileVTKRoot = SrcParamData%OutFileVTKRoot
     DstParamData%VTK_tWidth = SrcParamData%VTK_tWidth
+    DstParamData%Ldr_NumPts = SrcParamData%Ldr_NumPts
  END SUBROUTINE AWAE_CopyParam
 
  SUBROUTINE AWAE_DestroyParam( ParamData, ErrStat, ErrMsg )
@@ -5671,6 +5682,7 @@ ENDIF
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%OutFileRoot)  ! OutFileRoot
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%OutFileVTKRoot)  ! OutFileVTKRoot
       Int_BufSz  = Int_BufSz  + 1  ! VTK_tWidth
+      Int_BufSz  = Int_BufSz  + 1  ! Ldr_NumPts
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -6033,6 +6045,8 @@ ENDIF
       Int_Xferred = Int_Xferred + 1
     END DO ! I
     IntKiBuf(Int_Xferred) = InData%VTK_tWidth
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%Ldr_NumPts
     Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_PackParam
 
@@ -6457,6 +6471,8 @@ ENDIF
     END DO ! I
     OutData%VTK_tWidth = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
+    OutData%Ldr_NumPts = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_UnPackParam
 
  SUBROUTINE AWAE_CopyOutput( SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg )
@@ -6532,6 +6548,20 @@ IF (ALLOCATED(SrcOutputData%Vx_wind_disk)) THEN
   END IF
     DstOutputData%Vx_wind_disk = SrcOutputData%Vx_wind_disk
 ENDIF
+IF (ALLOCATED(SrcOutputData%Ldr_Vel)) THEN
+  i1_l = LBOUND(SrcOutputData%Ldr_Vel,1)
+  i1_u = UBOUND(SrcOutputData%Ldr_Vel,1)
+  i2_l = LBOUND(SrcOutputData%Ldr_Vel,2)
+  i2_u = UBOUND(SrcOutputData%Ldr_Vel,2)
+  IF (.NOT. ALLOCATED(DstOutputData%Ldr_Vel)) THEN 
+    ALLOCATE(DstOutputData%Ldr_Vel(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%Ldr_Vel.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstOutputData%Ldr_Vel = SrcOutputData%Ldr_Vel
+ENDIF
  END SUBROUTINE AWAE_CopyOutput
 
  SUBROUTINE AWAE_DestroyOutput( OutputData, ErrStat, ErrMsg )
@@ -6557,6 +6587,9 @@ IF (ALLOCATED(OutputData%TI_amb)) THEN
 ENDIF
 IF (ALLOCATED(OutputData%Vx_wind_disk)) THEN
   DEALLOCATE(OutputData%Vx_wind_disk)
+ENDIF
+IF (ALLOCATED(OutputData%Ldr_Vel)) THEN
+  DEALLOCATE(OutputData%Ldr_Vel)
 ENDIF
  END SUBROUTINE AWAE_DestroyOutput
 
@@ -6633,6 +6666,11 @@ ENDIF
   IF ( ALLOCATED(InData%Vx_wind_disk) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! Vx_wind_disk upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%Vx_wind_disk)  ! Vx_wind_disk
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! Ldr_Vel allocated yes/no
+  IF ( ALLOCATED(InData%Ldr_Vel) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*2  ! Ldr_Vel upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%Ldr_Vel)  ! Ldr_Vel
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
@@ -6755,6 +6793,26 @@ ENDIF
       DO i1 = LBOUND(InData%Vx_wind_disk,1), UBOUND(InData%Vx_wind_disk,1)
         ReKiBuf(Re_Xferred) = InData%Vx_wind_disk(i1)
         Re_Xferred = Re_Xferred + 1
+      END DO
+  END IF
+  IF ( .NOT. ALLOCATED(InData%Ldr_Vel) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Ldr_Vel,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Ldr_Vel,1)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Ldr_Vel,2)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Ldr_Vel,2)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i2 = LBOUND(InData%Ldr_Vel,2), UBOUND(InData%Ldr_Vel,2)
+        DO i1 = LBOUND(InData%Ldr_Vel,1), UBOUND(InData%Ldr_Vel,1)
+          ReKiBuf(Re_Xferred) = InData%Ldr_Vel(i1,i2)
+          Re_Xferred = Re_Xferred + 1
+        END DO
       END DO
   END IF
  END SUBROUTINE AWAE_PackOutput
@@ -6908,6 +6966,29 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Ldr_Vel not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i2_l = IntKiBuf( Int_Xferred    )
+    i2_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%Ldr_Vel)) DEALLOCATE(OutData%Ldr_Vel)
+    ALLOCATE(OutData%Ldr_Vel(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%Ldr_Vel.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i2 = LBOUND(OutData%Ldr_Vel,2), UBOUND(OutData%Ldr_Vel,2)
+        DO i1 = LBOUND(OutData%Ldr_Vel,1), UBOUND(OutData%Ldr_Vel,1)
+          OutData%Ldr_Vel(i1,i2) = ReKiBuf(Re_Xferred)
+          Re_Xferred = Re_Xferred + 1
+        END DO
+      END DO
+  END IF
  END SUBROUTINE AWAE_UnPackOutput
 
  SUBROUTINE AWAE_CopyInput( SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg )
@@ -7005,6 +7086,20 @@ IF (ALLOCATED(SrcInputData%D_wake)) THEN
   END IF
     DstInputData%D_wake = SrcInputData%D_wake
 ENDIF
+IF (ALLOCATED(SrcInputData%Ldr_MeasPos)) THEN
+  i1_l = LBOUND(SrcInputData%Ldr_MeasPos,1)
+  i1_u = UBOUND(SrcInputData%Ldr_MeasPos,1)
+  i2_l = LBOUND(SrcInputData%Ldr_MeasPos,2)
+  i2_u = UBOUND(SrcInputData%Ldr_MeasPos,2)
+  IF (.NOT. ALLOCATED(DstInputData%Ldr_MeasPos)) THEN 
+    ALLOCATE(DstInputData%Ldr_MeasPos(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%Ldr_MeasPos.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstInputData%Ldr_MeasPos = SrcInputData%Ldr_MeasPos
+ENDIF
  END SUBROUTINE AWAE_CopyInput
 
  SUBROUTINE AWAE_DestroyInput( InputData, ErrStat, ErrMsg )
@@ -7030,6 +7125,9 @@ IF (ALLOCATED(InputData%Vr_wake)) THEN
 ENDIF
 IF (ALLOCATED(InputData%D_wake)) THEN
   DEALLOCATE(InputData%D_wake)
+ENDIF
+IF (ALLOCATED(InputData%Ldr_MeasPos)) THEN
+  DEALLOCATE(InputData%Ldr_MeasPos)
 ENDIF
  END SUBROUTINE AWAE_DestroyInput
 
@@ -7092,6 +7190,11 @@ ENDIF
   IF ( ALLOCATED(InData%D_wake) ) THEN
     Int_BufSz   = Int_BufSz   + 2*2  ! D_wake upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%D_wake)  ! D_wake
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! Ldr_MeasPos allocated yes/no
+  IF ( ALLOCATED(InData%Ldr_MeasPos) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*2  ! Ldr_MeasPos upper/lower bounds for each dimension
+      Re_BufSz   = Re_BufSz   + SIZE(InData%Ldr_MeasPos)  ! Ldr_MeasPos
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
@@ -7236,6 +7339,26 @@ ENDIF
       DO i2 = LBOUND(InData%D_wake,2), UBOUND(InData%D_wake,2)
         DO i1 = LBOUND(InData%D_wake,1), UBOUND(InData%D_wake,1)
           ReKiBuf(Re_Xferred) = InData%D_wake(i1,i2)
+          Re_Xferred = Re_Xferred + 1
+        END DO
+      END DO
+  END IF
+  IF ( .NOT. ALLOCATED(InData%Ldr_MeasPos) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Ldr_MeasPos,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Ldr_MeasPos,1)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Ldr_MeasPos,2)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Ldr_MeasPos,2)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i2 = LBOUND(InData%Ldr_MeasPos,2), UBOUND(InData%Ldr_MeasPos,2)
+        DO i1 = LBOUND(InData%Ldr_MeasPos,1), UBOUND(InData%Ldr_MeasPos,1)
+          ReKiBuf(Re_Xferred) = InData%Ldr_MeasPos(i1,i2)
           Re_Xferred = Re_Xferred + 1
         END DO
       END DO
@@ -7402,6 +7525,29 @@ ENDIF
       DO i2 = LBOUND(OutData%D_wake,2), UBOUND(OutData%D_wake,2)
         DO i1 = LBOUND(OutData%D_wake,1), UBOUND(OutData%D_wake,1)
           OutData%D_wake(i1,i2) = ReKiBuf(Re_Xferred)
+          Re_Xferred = Re_Xferred + 1
+        END DO
+      END DO
+  END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Ldr_MeasPos not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i2_l = IntKiBuf( Int_Xferred    )
+    i2_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%Ldr_MeasPos)) DEALLOCATE(OutData%Ldr_MeasPos)
+    ALLOCATE(OutData%Ldr_MeasPos(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%Ldr_MeasPos.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i2 = LBOUND(OutData%Ldr_MeasPos,2), UBOUND(OutData%Ldr_MeasPos,2)
+        DO i1 = LBOUND(OutData%Ldr_MeasPos,1), UBOUND(OutData%Ldr_MeasPos,1)
+          OutData%Ldr_MeasPos(i1,i2) = ReKiBuf(Re_Xferred)
           Re_Xferred = Re_Xferred + 1
         END DO
       END DO
