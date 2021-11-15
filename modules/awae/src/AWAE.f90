@@ -944,7 +944,10 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       end if
 
          ! Set the position inputs once for the low-resolution grid
-      m%u_IfW_Low%PositionXYZ = p%Grid_low
+      m%u_IfW_Low%PositionXYZ(1:3,1:p%NumGrid_low) = p%Grid_low(1:3,1:p%NumGrid_low)   ! There may be lidar points following, so only copy portion of array.
+      if (p%Ldr_NumPts > 0_IntKi) then
+         m%u_IfW_Low%PositionXYZ(1:3,p%NumGrid_Low+1:p%NumGrid_Low+p%Ldr_NumPts) = 0.0_ReKi   ! Don't have lidar position information yet
+      endif
 
          ! Initialize the high-resolution grid inputs and outputs
        IF ( .NOT. ALLOCATED( m%u_IfW_High%PositionXYZ ) ) THEN
@@ -1269,7 +1272,10 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
 
    else ! p%Mod_AmbWind == 2 .or. 3
 
-      ! Set low-resolution inflow wind velocities
+      ! Set low-resolution inflow wind Lidar positions
+      if (p%Ldr_NumPts > 0_IntKi) then
+         m%u_IfW_Low%PositionXYZ(1:3,p%NumGrid_Low+1:p%NumGrid_Low+p%Ldr_NumPts) = 0.0_ReKi   ! Don't have lidar position information yet
+      endif
       call InflowWind_CalcOutput(t+p%dt_low, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), errStat, errMsg)
       if ( errStat >= AbortErrLev ) then
          return
