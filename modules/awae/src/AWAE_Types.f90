@@ -165,6 +165,7 @@ IMPLICIT NONE
     TYPE(InflowWind_InputType)  :: u_IfW_High      !< InflowWind module inputs for the high-resolution grid [-]
     TYPE(InflowWind_OutputType)  :: y_IfW_Low      !< InflowWind module outputs for the low-resolution grid [-]
     TYPE(InflowWind_OutputType)  :: y_IfW_High      !< InflowWind module outputs for the high-resolution grid [-]
+    LOGICAL  :: WarnedLidarDomain = .FALSE.      !< Warning issued for Lidar outside Low Res domain [-]
   END TYPE AWAE_MiscVarType
 ! =======================
 ! =========  AWAE_ParameterType  =======
@@ -3537,6 +3538,7 @@ ENDIF
       CALL InflowWind_CopyOutput( SrcMiscData%y_IfW_High, DstMiscData%y_IfW_High, CtrlCode, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
          IF (ErrStat>=AbortErrLev) RETURN
+    DstMiscData%WarnedLidarDomain = SrcMiscData%WarnedLidarDomain
  END SUBROUTINE AWAE_CopyMisc
 
  SUBROUTINE AWAE_DestroyMisc( MiscData, ErrStat, ErrMsg )
@@ -3852,6 +3854,7 @@ ENDIF
          Int_BufSz = Int_BufSz + SIZE( Int_Buf )
          DEALLOCATE(Int_Buf)
       END IF
+      Int_BufSz  = Int_BufSz  + 1  ! WarnedLidarDomain
   IF ( Re_BufSz  .GT. 0 ) THEN 
      ALLOCATE( ReKiBuf(  Re_BufSz  ), STAT=ErrStat2 )
      IF (ErrStat2 /= 0) THEN 
@@ -4473,6 +4476,8 @@ ENDIF
       ELSE
         IntKiBuf( Int_Xferred ) = 0; Int_Xferred = Int_Xferred + 1
       ENDIF
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%WarnedLidarDomain, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_PackMisc
 
  SUBROUTINE AWAE_UnPackMisc( ReKiBuf, DbKiBuf, IntKiBuf, Outdata, ErrStat, ErrMsg )
@@ -5228,6 +5233,8 @@ ENDIF
       IF(ALLOCATED(Re_Buf )) DEALLOCATE(Re_Buf )
       IF(ALLOCATED(Db_Buf )) DEALLOCATE(Db_Buf )
       IF(ALLOCATED(Int_Buf)) DEALLOCATE(Int_Buf)
+    OutData%WarnedLidarDomain = TRANSFER(IntKiBuf(Int_Xferred), OutData%WarnedLidarDomain)
+    Int_Xferred = Int_Xferred + 1
  END SUBROUTINE AWAE_UnPackMisc
 
  SUBROUTINE AWAE_CopyParam( SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg )

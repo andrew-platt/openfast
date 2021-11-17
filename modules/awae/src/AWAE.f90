@@ -208,6 +208,8 @@ subroutine LowResGridCalcOutput(n, u, p, y, m, errStat, errMsg)
    integer(IntKi)      :: ILo
    integer(IntKi)      :: maxPln, tmpPln, maxN_wake
    integer(IntKi)      :: i,np1,errStat2
+   logical             :: LdrOutsideDomain
+   character(ErrMsgLen) :: LdrMsg
    character(*), parameter   :: RoutineName = 'LowResGridCalcOutput'
    logical             :: within
 
@@ -502,6 +504,31 @@ subroutine LowResGridCalcOutput(n, u, p, y, m, errStat, errMsg)
 !   write(*,*)  'Total AWAE:LowResGridCalcOutput using '//trim(num2lstr(tm2-tm1))//' seconds'
 
 !#endif 
+
+   ! Set output Lidar data
+   if (p%Ldr_NumPts > 0_IntKi) then
+      LdrOutsideDomain = .FALSE.
+      LdrMsg = ''
+      do i=1,p%Ldr_NumPts
+         y%Ldr_Vel(1:3,i) = INTERP3D( u%Ldr_MeasPos(1:3,i), p%Grid_Low(:,1), p%dXYZ_Low, m%Vdist_low, within, p%nX_low, p%nY_low, p%nZ_low )
+         ! Warn users if a requested lidar point is outside the domain.
+         if ((.not. m%WarnedLidarDomain) .and. (.not. within)) then
+            LdrMsg=trim(LdrMsg)//NewLine//'       ('//trim(Num2LStr(u%Ldr_MeasPos(1,i)))//','//trim(Num2LStr(u%Ldr_MeasPos(2,i)))//','//trim(Num2LStr(u%Ldr_MeasPos(3,i)))//')'
+            LdrOutsideDomain = .TRUE.
+         endif
+      enddo
+      ! Issue warning (first time only, then turn off further warnings)
+      if (LdrOutsideDomain) then
+         i = size(p%Grid_Low,2)
+         call WrScr('Lidar points requested outside low resolution domain! ')
+         call WrScr('   Diagonal corners of low resolution domain: '//  &
+                     '('//trim(Num2LStr(p%Grid_Low(1,1)))//','//trim(Num2LStr(p%Grid_Low(2,1)))//','//trim(Num2LStr(p%Grid_Low(3,1)))//') and '// &
+                     '('//trim(Num2LStr(p%Grid_Low(1,i)))//','//trim(Num2LStr(p%Grid_Low(2,i)))//','//trim(Num2LStr(p%Grid_Low(3,i)))//')')
+         call WrScr('   Lidar measurement points: '//trim(LdrMsg))
+         call WrScr('   Further warnings will be suppressed')
+         m%WarnedLidarDomain = .TRUE.
+      endif
+   endif
 
    if (allocated(tmp_xhat_plane)) deallocate(tmp_xhat_plane)
    if (allocated(tmp_rhat_plane)) deallocate(tmp_rhat_plane)
@@ -1772,6 +1799,7 @@ FUNCTION INTERP3D(p,p0,del,V,within,nX,nY,nZ,Vbox)
          Real(SiKi)            :: Vtmp(3,8)
          INTEGER(IntKi)        :: n_lo(3), n_hi(3)
 
+   Vtmp = 0.0_SiKi
 
      !!! CHECK BOUNDS
    within = .TRUE.
@@ -1780,7 +1808,7 @@ FUNCTION INTERP3D(p,p0,del,V,within,nX,nY,nZ,Vbox)
       n_lo(i) = FLOOR(f(i))
       n_hi(i) = n_lo(i)+1_IntKi
       f(i) = 2.0_ReKi*( f(i)-REAL(n_lo(i),ReKi) )-1.0_ReKi  ! convert to value between -1 and 1
-      if (( n_lo(i) < 0) .OR. (n_hi(i) > size(V,i+1)-1)) THEN
+      if (( n_lo(i) < 0) .OR. ( n_lo(i) > size(V,i+1)-1) .OR. (n_hi(i) < 0) .OR. (n_hi(i) > size(V,i+1)-1)) THEN
          within = .FALSE.
       END IF
    end do

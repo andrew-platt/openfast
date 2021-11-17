@@ -137,6 +137,7 @@ typedef   ^ MiscVarType    InflowWind_InputType u_IfW_Low    - - - "InflowWind m
 typedef   ^ MiscVarType    InflowWind_InputType u_IfW_High    - - - "InflowWind module inputs for the high-resolution grid" 
 typedef   ^ MiscVarType    InflowWind_OutputType y_IfW_Low    - - - "InflowWind module outputs for the low-resolution grid" 
 typedef   ^ MiscVarType    InflowWind_OutputType y_IfW_High    - - - "InflowWind module outputs for the high-resolution grid" 
+typedef   ^ MiscVarType    Logical  WarnedLidarDomain - .FALSE. -  "Warning issued for Lidar outside Low Res domain" -
 
 # ..... Parameters ................................................................................................................
 # Define parameters here:
