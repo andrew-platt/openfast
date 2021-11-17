@@ -9001,7 +9001,7 @@ END SUBROUTINE CheckR16Var
       CHARACTER(*)    , INTENT(IN   )        :: FileName             !< Name of output file    
       INTEGER(IntKi)  , INTENT(IN   )        :: Un                   !< unit number of opened file
       INTEGER(IntKi)  , INTENT(IN   )        :: dims(3)              !< dimension of the 3D grid (nX,nY,nZ)
-      REAL(SiKi)      , INTENT(  OUT)        :: gridVals(:,:,:,:)    !< 4D array of data, size (3,nX,nY,nZ), must be pre-allocated
+      REAL(SiKi)      , INTENT(INOUT)        :: gridVals(:,:,:,:)    !< 4D array of data, size (3,nX,nY,nZ), must be pre-allocated
       INTEGER(IntKi)  , INTENT(  OUT)        :: ErrStat              !< error level/status of OpenFOutFile operation
       CHARACTER(*)    , INTENT(  OUT)        :: ErrMsg               !< message when error occurs
       
