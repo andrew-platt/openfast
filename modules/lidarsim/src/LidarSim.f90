@@ -340,6 +340,17 @@ SUBROUTINE LidarSim_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       y%LidarMeasMesh%RemapFlag  = .false.
 
       !--------------------
+      ! Set the velocity vis mesh
+      call MeshCopy( SrcMesh           =  y%LidarMeasMesh      ,&
+                     DestMesh          =  y%LidarVelVisMesh    ,&
+                     CtrlCode          =  MESH_COUSIN          ,&
+                     IOS               =  COMPONENT_OUTPUT     ,&
+                     ErrStat           =  TmpErrStat           ,&
+                     ErrMess           =  TmpErrMsg            ,&
+                     TranslationDisp   =  .TRUE.               ,&
+                     TranslationVel    =  .TRUE.               )
+
+      !--------------------
       ! create mesh mapping
       call MeshMapCreate( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
          call SetErrStat( TmpErrStat, TmpErrMsg, ErrStat2, ErrMsg2, '')
@@ -393,6 +404,8 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
     ! update the output mesh
     call Transfer_Point_to_Point( u%LidarMesh, y%LidarMeasMesh, m%u_L_p2p_y_Lmeas, TmpErrStat, TmpErrMsg )
     call SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
+    call MeshCopy( y%LidarMeasMesh,  y%LidarVelVisMesh, MESH_UPDATECOPY, TmpErrStat, TmpErrMsg )
+    call SetErrStat(TmpErrStat,TmpErrMsg,ErrStat,ErrMsg,RoutineName)
 
     IF(m%MeasurementCurrentStep>=p%MeasurementMaxSteps .OR. m%MeasurementCurrentStep == -1)THEN         !Check if there must be a new measurement     !(NINT(Time*1000)-NINT(p%t_last_measurement*1000)) >= NINT(p%t_measurement_interval*1000)
         m%MeasurementCurrentStep = 0
@@ -402,11 +415,11 @@ SUBROUTINE LidarSim_CalcOutput (Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
         DO LoopGatesPerBeam = 0,p%GatesPerBeam-1
             StrtPt = p%nWeightPts * (m%LastMeasuringPoint-1 + LoopGatesPerBeam) + 1
             ! lidar measurement position in inertial coordinates
-!FIXME: can use the first weighted point for the unit vector
             MeasuringPosition_I = LidarSim_TransformLidarToInertial(u%LidarMesh, p, p%MeasuringPoints_L(:,m%LastMeasuringPoint+LoopGatesPerBeam)) ! Calculate the Measuringpoint coordinate in the initial system
             WeightPos(1:3,1:p%nWeightPts) = y%LidarMeasMesh%Position(       :,StrtPt:StrtPt+p%nWeightPts-1) &
                                           + y%LidarMeasMesh%TranslationDisp(:,StrtPt:StrtPt+p%nWeightPts-1)
             WindVel(1:3,1:p%nWeightPts)   = u%WindVelocity(                 :,StrtPt:StrtPt+p%nWeightPts-1)
+            y%LidarVelVisMesh%TranslationVel(:,StrtPt:StrtPt+p%nWeightPts-1) = WindVel(1:3,1:p%nWeightPts)
 
             !Line of Sight
             UnitVector    =   MeasuringPosition_I - LidarPosition_I             !Calculation of the Line of Sight Vector

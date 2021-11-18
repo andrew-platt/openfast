@@ -22,6 +22,7 @@ typedef  ^                 OutputType     ReKi     SwapOutputs          :   -   
 typedef  ^                 OutputType     ReKi     AllOutputs           :   -   -   "Array containing all possible outputs"   -
 typedef  ^                 OutputType     ReKi     IMUOutputs           :   -   -   "Array containing Position, Velocity, and Acceleration of the lidar system" -
 typedef  ^                 OutputType     MeshType LidarMeasMesh        -   -   -   "Motion Mesh of all measurement points -- for visualization and wind velocity inputs" -
+typedef  ^                 OutputType     MeshType LidarVelVisMesh      -   -   -   "Motion Mesh of all measurement points -- for visualization wind velocity" -
 
  ..... LidarSim_ParameterType data .......................................................................................................
 typedef  LidarSim/LidarSim ParameterType  IntKi    MeasurementMaxSteps           -        -   -   "Time steps between lidar measurements" -

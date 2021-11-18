@@ -69,6 +69,11 @@ IMPLICIT NONE
     LOGICAL  :: SumPrint      !< Print summary data to file? (.sum) [-]
     LOGICAL  :: WrBinOutFile      !< Write a binary output file? (.outb) [-]
     LOGICAL  :: WrTxtOutFile      !< Write a text (formatted) output file? (.out) [-]
+    REAL(DbKi)  :: WrDisDT      !< time between vtk outputs [-]
+    LOGICAL  :: WrLdrVis      !< Write Farm level Lidar visualization info (lidar position, lidar measurement points and values) [-]
+    INTEGER(IntKi)  :: WrLdrVisDisSkp1      !< Number of time steps to skip plus one for vtk from Lidar [-]
+    CHARACTER(1024) , DIMENSION(:), ALLOCATABLE  :: LdrVTKRoot      !< The root name for VTK outputs [-]
+    INTEGER(IntKi)  :: LdrVTK_tWidth      !< Number of characters for VTK timestamp outputs [-]
     CHARACTER(1)  :: Delim      !< Delimiter between columns of text output file (.out): space or tab [-]
     CHARACTER(20)  :: OutFmt      !< Format used for text tabular output (except time); resulting field should be 10 characters [-]
     CHARACTER(20)  :: OutFmt_t      !< Format used for time channel in text tabular output; resulting field should be 10 characters [-]
@@ -285,6 +290,22 @@ ENDIF
     DstParamData%SumPrint = SrcParamData%SumPrint
     DstParamData%WrBinOutFile = SrcParamData%WrBinOutFile
     DstParamData%WrTxtOutFile = SrcParamData%WrTxtOutFile
+    DstParamData%WrDisDT = SrcParamData%WrDisDT
+    DstParamData%WrLdrVis = SrcParamData%WrLdrVis
+    DstParamData%WrLdrVisDisSkp1 = SrcParamData%WrLdrVisDisSkp1
+IF (ALLOCATED(SrcParamData%LdrVTKRoot)) THEN
+  i1_l = LBOUND(SrcParamData%LdrVTKRoot,1)
+  i1_u = UBOUND(SrcParamData%LdrVTKRoot,1)
+  IF (.NOT. ALLOCATED(DstParamData%LdrVTKRoot)) THEN 
+    ALLOCATE(DstParamData%LdrVTKRoot(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%LdrVTKRoot.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstParamData%LdrVTKRoot = SrcParamData%LdrVTKRoot
+ENDIF
+    DstParamData%LdrVTK_tWidth = SrcParamData%LdrVTK_tWidth
     DstParamData%Delim = SrcParamData%Delim
     DstParamData%OutFmt = SrcParamData%OutFmt
     DstParamData%OutFmt_t = SrcParamData%OutFmt_t
@@ -414,6 +435,9 @@ ENDIF
 IF (ALLOCATED(ParamData%Ldr_WndPtRng)) THEN
   DEALLOCATE(ParamData%Ldr_WndPtRng)
 ENDIF
+IF (ALLOCATED(ParamData%LdrVTKRoot)) THEN
+  DEALLOCATE(ParamData%LdrVTKRoot)
+ENDIF
 IF (ALLOCATED(ParamData%OutRadii)) THEN
   DEALLOCATE(ParamData%OutRadii)
 ENDIF
@@ -517,6 +541,15 @@ ENDDO
       Int_BufSz  = Int_BufSz  + 1  ! SumPrint
       Int_BufSz  = Int_BufSz  + 1  ! WrBinOutFile
       Int_BufSz  = Int_BufSz  + 1  ! WrTxtOutFile
+      Db_BufSz   = Db_BufSz   + 1  ! WrDisDT
+      Int_BufSz  = Int_BufSz  + 1  ! WrLdrVis
+      Int_BufSz  = Int_BufSz  + 1  ! WrLdrVisDisSkp1
+  Int_BufSz   = Int_BufSz   + 1     ! LdrVTKRoot allocated yes/no
+  IF ( ALLOCATED(InData%LdrVTKRoot) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*1  ! LdrVTKRoot upper/lower bounds for each dimension
+      Int_BufSz  = Int_BufSz  + SIZE(InData%LdrVTKRoot)*LEN(InData%LdrVTKRoot)  ! LdrVTKRoot
+  END IF
+      Int_BufSz  = Int_BufSz  + 1  ! LdrVTK_tWidth
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%Delim)  ! Delim
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%OutFmt)  ! OutFmt
       Int_BufSz  = Int_BufSz  + 1*LEN(InData%OutFmt_t)  ! OutFmt_t
@@ -769,6 +802,31 @@ ENDDO
     IntKiBuf(Int_Xferred) = TRANSFER(InData%WrBinOutFile, IntKiBuf(1))
     Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = TRANSFER(InData%WrTxtOutFile, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
+    DbKiBuf(Db_Xferred) = InData%WrDisDT
+    Db_Xferred = Db_Xferred + 1
+    IntKiBuf(Int_Xferred) = TRANSFER(InData%WrLdrVis, IntKiBuf(1))
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%WrLdrVisDisSkp1
+    Int_Xferred = Int_Xferred + 1
+  IF ( .NOT. ALLOCATED(InData%LdrVTKRoot) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%LdrVTKRoot,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%LdrVTKRoot,1)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i1 = LBOUND(InData%LdrVTKRoot,1), UBOUND(InData%LdrVTKRoot,1)
+        DO I = 1, LEN(InData%LdrVTKRoot)
+          IntKiBuf(Int_Xferred) = ICHAR(InData%LdrVTKRoot(i1)(I:I), IntKi)
+          Int_Xferred = Int_Xferred + 1
+        END DO ! I
+      END DO
+  END IF
+    IntKiBuf(Int_Xferred) = InData%LdrVTK_tWidth
     Int_Xferred = Int_Xferred + 1
     DO I = 1, LEN(InData%Delim)
       IntKiBuf(Int_Xferred) = ICHAR(InData%Delim(I:I), IntKi)
@@ -1150,6 +1208,34 @@ ENDDO
     OutData%WrBinOutFile = TRANSFER(IntKiBuf(Int_Xferred), OutData%WrBinOutFile)
     Int_Xferred = Int_Xferred + 1
     OutData%WrTxtOutFile = TRANSFER(IntKiBuf(Int_Xferred), OutData%WrTxtOutFile)
+    Int_Xferred = Int_Xferred + 1
+    OutData%WrDisDT = DbKiBuf(Db_Xferred)
+    Db_Xferred = Db_Xferred + 1
+    OutData%WrLdrVis = TRANSFER(IntKiBuf(Int_Xferred), OutData%WrLdrVis)
+    Int_Xferred = Int_Xferred + 1
+    OutData%WrLdrVisDisSkp1 = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! LdrVTKRoot not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%LdrVTKRoot)) DEALLOCATE(OutData%LdrVTKRoot)
+    ALLOCATE(OutData%LdrVTKRoot(i1_l:i1_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%LdrVTKRoot.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i1 = LBOUND(OutData%LdrVTKRoot,1), UBOUND(OutData%LdrVTKRoot,1)
+        DO I = 1, LEN(OutData%LdrVTKRoot)
+          OutData%LdrVTKRoot(i1)(I:I) = CHAR(IntKiBuf(Int_Xferred))
+          Int_Xferred = Int_Xferred + 1
+        END DO ! I
+      END DO
+  END IF
+    OutData%LdrVTK_tWidth = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     DO I = 1, LEN(OutData%Delim)
       OutData%Delim(I:I) = CHAR(IntKiBuf(Int_Xferred))

@@ -5558,8 +5558,8 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, MeshMapData, ED, BD, AD, IfW, OpFM, H
 !  LidarSim
    if (allocated(LidSim%Input)) then
       IF ( LidSim%Input(1)%LidarMesh%Committed ) THEN
-         call MeshWrVTK(p_FAST%TurbinePos, LidSim%Input(1)%LidarMesh, trim(p_FAST%VTK_OutFileRoot)//'.LidSim_Mount',   y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
-         call MeshWrVTK(p_FAST%TurbinePos, LidSim%y%LidarMeasMesh,    trim(p_FAST%VTK_OutFileRoot)//'.LidSim_Measure', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
+         call MeshWrVTK(p_FAST%TurbinePos, LidSim%Input(1)%LidarMesh, trim(p_FAST%VTK_OutFileRoot)//'.LidSim_Mount', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
+         call MeshWrVTK(p_FAST%TurbinePos, LidSim%y%LidarVelVisMesh,  trim(p_FAST%VTK_OutFileRoot)//'.LidSim_Vis',   y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
       END IF
    end if
 

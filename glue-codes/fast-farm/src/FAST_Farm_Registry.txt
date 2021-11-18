@@ -49,6 +49,11 @@ typedef  ^               ParameterType         IntKi           n_TMax          -
 typedef	^	             ParameterType	        LOGICAL	      SumPrint	       -	   - - "Print summary data to file? (.sum)"	-
 typedef  ^               ParameterType         LOGICAL         WrBinOutFile    -    - - "Write a binary output file? (.outb)" -
 typedef  ^               ParameterType         LOGICAL         WrTxtOutFile    -    - - "Write a text (formatted) output file? (.out)" -
+typedef  ^               ParameterType         DbKi            WrDisDT         -    - - "time between vtk outputs" -
+typedef  ^               ParameterType         LOGICAL         WrLdrVis        -    - - "Write Farm level Lidar visualization info (lidar position, lidar measurement points and values)" -
+typedef  ^               ParameterType         IntKi           WrLdrVisDisSkp1 -    - - "Number of time steps to skip plus one for vtk from Lidar" -
+typedef  ^               ParameterType         CHARACTER(1024) LdrVTKRoot     {:}   - - "The root name for VTK outputs" -
+typedef  ^               ParameterType         IntKi           LdrVTK_tWidth   -    - - "Number of characters for VTK timestamp outputs" -
 typedef  ^               ParameterType         CHARACTER(1)    Delim           -    - - "Delimiter between columns of text output file (.out): space or tab" -
 typedef  ^               ParameterType         CHARACTER(20)   OutFmt          -    - - "Format used for text tabular output (except time); resulting field should be 10 characters" -
 typedef  ^               ParameterType         CHARACTER(20)   OutFmt_t        -    - - "Format used for time channel in text tabular output; resulting field should be 10 characters" -

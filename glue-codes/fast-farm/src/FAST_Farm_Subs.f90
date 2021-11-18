@@ -1187,7 +1187,7 @@ SUBROUTINE Farm_ReadPrimaryFile( InputFile, p, WD_InitInp, AWAE_InitInp, SC_Init
       end if      
                   
           ! WrDisDT -The time between vtk outputs [must be a multiple of the low resolution time step]:
-   CALL ReadVarWDefault( UnIn, InputFile, AWAE_InitInp%WrDisDT, "WrDisDT", &
+   CALL ReadVarWDefault( UnIn, InputFile, p%WrDisDT, "WrDisDT", &
       "The time between vtk outputs [must be a multiple of the low resolution time step]", &
       p%DT_low, ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1195,7 +1195,16 @@ SUBROUTINE Farm_ReadPrimaryFile( InputFile, p, WD_InitInp, AWAE_InitInp, SC_Init
          call cleanup()
          RETURN        
       end if
-      
+   AWAE_InitInp%WrDisDT = p%WrDisDT
+     
+      ! WrLdrVis - Write Farm level Lidar info (lidar position, lidar measurement points and values)
+   CALL ReadVar( UnIn, InputFile, p%WrLdrVis, "WrLdrVis", "Write Lidar measurement info to <OutFileRoot>.LidSim#_Meas.t<n/n_low-out>.vtk etc.? (flag)", ErrStat2, ErrMsg2, UnEc)
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName) 
+      if ( ErrStat >= AbortErrLev ) then
+         call cleanup()
+         RETURN        
+      end if
+  
       
    !---------------------- OUTPUT --------------------------------------------------
    CALL ReadCom( UnIn, InputFile, 'Section Header: Output', ErrStat2, ErrMsg2, UnEc )
@@ -1856,9 +1865,20 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          if (ErrStat >= AbortErrLev) return
       enddo
+
+      if (farm%p%WrLdrVis) then
+         do iLid=1,farm%p%NumLidar
+            if ( farm%LidSim(iLid)%u%LidarMesh%Committed ) then
+               call MeshWrVTK( (/ 0.0_SiKi, 0.0_SiKi, 0.0_SiKi /), farm%LidSim(iLid)%u%LidarMesh,       trim(farm%p%LdrVTKRoot(iLid))//'_Mount', 0_IntKi, .TRUE., ErrStat2, ErrMsg2, farm%p%LdrVTK_tWidth )
+                  call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName); if (ErrStat >= AbortErrLev) return
+               call MeshWrVTK( (/ 0.0_SiKi, 0.0_SiKi, 0.0_SiKi /), farm%LidSim(iLid)%y%LidarVelVisMesh, trim(farm%p%LdrVTKRoot(iLid))//'_Vis',   0_IntKi, .TRUE., ErrStat2, ErrMsg2, farm%p%LdrVTK_tWidth )
+                  call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName); if (ErrStat >= AbortErrLev) return
+            end if
+         enddo
+      endif
    endif
    
-    !.......................................................................................
+   !.......................................................................................
    ! Write Output to File
    !.......................................................................................
    
@@ -2342,6 +2362,20 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          if (ErrStat >= AbortErrLev) return
       enddo
+
+      if (farm%p%WrLdrVis) then
+         n = nint(t/farm%p%dt_low)
+         if (mod(n,farm%p%WrLdrVisDisSkp1) == 0) then
+            do iLid=1,farm%p%NumLidar
+               if ( farm%LidSim(iLid)%u%LidarMesh%Committed ) then
+                  call MeshWrVTK( (/ 0.0_SiKi, 0.0_SiKi, 0.0_SiKi /), farm%LidSim(iLid)%u%LidarMesh,       trim(farm%p%LdrVTKRoot(iLid))//'_Mount', n/farm%p%WrLdrVisDisSkp1, .TRUE., ErrStat2, ErrMsg2, farm%p%LdrVTK_tWidth )
+                     call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName); if (ErrStat >= AbortErrLev) return
+                  call MeshWrVTK( (/ 0.0_SiKi, 0.0_SiKi, 0.0_SiKi /), farm%LidSim(iLid)%y%LidarVelVisMesh, trim(farm%p%LdrVTKRoot(iLid))//'_Vis',   n/farm%p%WrLdrVisDisSkp1, .TRUE., ErrStat2, ErrMsg2, farm%p%LdrVTK_tWidth )
+                     call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName); if (ErrStat >= AbortErrLev) return
+               end if
+            enddo
+         endif
+      endif
    endif
   
 
@@ -2472,6 +2506,7 @@ subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
    integer(intKi)                           :: iLid                           ! loop counter for lidar instance
    integer(intKi)                           :: ErrStat2                       ! Temporary Error status
    character(ErrMsgLen)                     :: ErrMsg2                        ! Temporary Error message
+   character(1024)                          :: rootDir, baseName, LdrVTKDir ! Simulation root dir, basename for outputs, Lidar Vtk Dir
 
    ErrStat = ErrID_None
    ErrMsg = ""
@@ -2516,6 +2551,23 @@ subroutine Farm_InitLidar( farm, ErrStat, ErrMsg )
       !  -- End index (inclusive)
       farm%p%Ldr_WndPtRng(2,iLid) = farm%p%Ldr_WndPtRng(1,iLid) - 1_IntKi + farm%LidSim(iLid)%y%LidarMeasMesh%Nnodes
    enddo
+
+   ! Visualization output
+   if (farm%p%WrLdrVis .and. (farm%p%NumLidar > 0)) then
+      call GetPath( farm%p%OutFileRoot, rootDir, baseName ) 
+      LdrVTKDir    = trim(rootDir) // 'vtk_fLdr'  ! Directory for VTK outputs
+      allocate(farm%p%LdrVTKRoot(farm%p%NumLidar),STAT=ErrStat2)
+      if (ErrStat2 /= 0) then
+         CALL SetErrStat( ErrID_Fatal, 'Could not allocate memory for LidarSim visualization', ErrStat, ErrMsg, RoutineName )
+         return
+      end if
+      farm%p%WrLdrVisDisSkp1 = nint(farm%p%WrDisDT / farm%p%dt_low)
+      farm%p%LdrVTK_tWidth = CEILING( log10( real(farm%p%n_TMax, ReKi)/real(farm%p%WrLdrVisDisSkp1, ReKi) ) + 1) ! Length for time stamp
+      call MKDIR(LdrVTKDir) ! creating output directory (checks if already exists)
+      do iLid=1,farm%p%NumLidar
+         farm%p%LdrVTKRoot(iLid) = trim(LdrVTKDir) // PathSep // TRIM(basename)//'.FarmLidSim'//trim(num2LStr(iLid)) ! Basename for VTK files
+      enddo
+   endif
 
    ! get version info
    farm%p%Module_Ver(ModuleFF_LidSim) = LidSim_InitOut%Ver
