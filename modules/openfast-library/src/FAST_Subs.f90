@@ -5132,7 +5132,7 @@ SUBROUTINE WrOutputLine( t, p_FAST, y_FAST, IfWOutput, OpFMOutput, EDOutput, y_A
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: IceFOutput (:)                     !< IceFloe WriteOutput values
    TYPE(IceD_OutputType),    INTENT(IN)    :: y_IceD (:)                         !< IceDyn outputs (WriteOutput values are subset)
    TYPE(BD_OutputType),      INTENT(IN)    :: y_BD (:)                           !< BeamDyn outputs (WriteOutput values are subset)
-   REAL(ReKi),               INTENT(IN)    :: LidSimOutput(:)                    !< LidarSim WriteOutput values
+   REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: LidSimOutput(:)                    !< LidarSim WriteOutput values
 
    INTEGER(IntKi),           INTENT(OUT)   :: ErrStat                            !< Error status
    CHARACTER(*),             INTENT(OUT)   :: ErrMsg                             !< Error message
@@ -5237,7 +5237,7 @@ SUBROUTINE FillOutputAry(p_FAST, y_FAST, IfWOutput, OpFMOutput, EDOutput, y_AD, 
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: IceFOutput (:)                     !< IceFloe WriteOutput values
    TYPE(IceD_OutputType),    INTENT(IN)    :: y_IceD (:)                         !< IceDyn outputs (WriteOutput values are subset)
    TYPE(BD_OutputType),      INTENT(IN)    :: y_BD (:)                           !< BeamDyn outputs (WriteOutput values are subset)
-   REAL(ReKi),               INTENT(IN)    :: LidSimOutput(:)                    !< LidarSim WriteOutput values
+   REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: LidSimOutput(:)                    !< LidarSim WriteOutput values
 
    REAL(ReKi),               INTENT(OUT)   :: OutputAry(:)                       !< single array of output
 
