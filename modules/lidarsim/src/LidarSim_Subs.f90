@@ -251,8 +251,7 @@ SUBROUTINE LidarSim_ParsePrimaryFileInfo( PriPath, InputFile, RootName, FileInfo
    if ( InputFileData%Echo )   WRITE(UnitEcho, '(A)') FileInfo%Lines(CurLine)    ! Write section break to echo
    CurLine = CurLine + 1
 
-   call ReadOutputListFromFileInfo( FileInfo, CurLine, InputFileData%OutList, &
-            InputFileData%NumOuts, 'OutList', "List of user-requested output channels", TmpErrStat, TmpErrMsg, UnitEcho )
+   call ReadOutputListFromFileInfo( FileInfo, CurLine, InputFileData%OutList, InputFileData%NumOuts, TmpErrStat, TmpErrMsg, UnitEcho )
          if (Failed()) return;
 
    CALL Cleanup()
