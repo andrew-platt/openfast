@@ -1178,7 +1178,18 @@ SUBROUTINE Farm_ReadPrimaryFile( InputFile, p, WD_InitInp, AWAE_InitInp, SC_Init
            AWAE_InitInp%Mod_Projection=1
       endif
    endif
-
+   !----------------------- WAKE-ADDED TURBULENCE ------------------------------------------
+   ! Read WAT variables
+   WD_InitInp%WAT_k_Def  =1.0_ReKi
+   WD_InitInp%WAT_k_Grad =1.0_ReKi
+   !CALL ReadCom( UnIn, InputFile, 'Section Header: Wake-added turbulence', ErrStat2, ErrMsg2, UnEc )
+   !CALL ReadVar( UnIn, InputFile, WD_InitInp%WAT, "WAT", "Switch for turning on and off wake-added turbulence", ErrStat2, ErrMsg2, UnEc); if(failed()) return
+   !CALL ReadCom( UnIn, InputFile, 'dummy predef', ErrStat2, ErrMsg2, UnEc )
+   !CALL ReadCom( UnIn, InputFile, 'dummy user', ErrStat2, ErrMsg2, UnEc )
+   !CALL ReadCom( UnIn, InputFile, 'dummy userdx', ErrStat2, ErrMsg2, UnEc )
+   !CALL ReadVarWDefault( UnIn, InputFile, WD_InitInp%WAT_k_Def,  "WAT_k_Def,     "Calibrated parameter for the influence of the wake deficit in the wake-added Turbulence (-) [>=0.0] or DEFAULT [DEFAULT=1.44]", 1.44_ReKi, ErrStat2, ErrMsg2, UnEc); if(failed()) return
+   !CALL ReadVarWDefault( UnIn, InputFile, WD_InitInp%WAT_k_Grad, "WAT_k_Grad",   "Calibrated parameter for the influence of the radial velocity gradient of the wake deficit in the wake-added Turbulence (-) [>=0.0] or DEFAULT [DEFAULT=0.84]",  0.84_ReKi, ErrStat2, ErrMsg2, UnEc); if(failed()) return
+   !IF ( PathIsRelative( p%File ) )p%File = TRIM(PriPath)//TRIM(p%File)
 
    !---------------------- VISUALIZATION --------------------------------------------------
    CALL ReadCom( UnIn, InputFile, 'Section Header: Visualization', ErrStat2, ErrMsg2, UnEc )
@@ -1575,19 +1586,26 @@ SUBROUTINE Farm_ValidateInput( p, WD_InitInp, AWAE_InitInp, SC_InitInp, ErrStat,
       END IF
    END IF
    
-   IF (WD_InitInp%FilterInit < 0  ) CALL SetErrStat(ErrID_Fatal,'FilterInit needs to >= 0',ErrStat,ErrMsg,RoutineName)
-   IF (AWAE_InitInp%Mod_Meander < MeanderMod_Uniform .or. AWAE_InitInp%Mod_Meander > MeanderMod_WndwdJinc) THEN
-      call SetErrStat(ErrID_Fatal,'Spatial filter model for wake meandering, Mod_Meander, must be 1 (uniform), 2 (truncated jinc), 3 (windowed jinc) or DEFAULT.',ErrStat,ErrMsg,RoutineName)
-   END IF
+
    
    IF (AWAE_InitInp%C_Meander < 1.0_Reki) THEN
       CALL SetErrStat(ErrID_Fatal,'C_Meander parameter must not be less than 1.',ErrStat,ErrMsg,RoutineName)
    END IF
+   
+   ! --- CURL
+   IF (WD_InitInp%FilterInit < 0  ) CALL SetErrStat(ErrID_Fatal,'FilterInit needs to >= 0',ErrStat,ErrMsg,RoutineName)
+   IF (AWAE_InitInp%Mod_Meander < MeanderMod_Uniform .or. AWAE_InitInp%Mod_Meander > MeanderMod_WndwdJinc) THEN
+      call SetErrStat(ErrID_Fatal,'Spatial filter model for wake meandering, Mod_Meander, must be 1 (uniform), 2 (truncated jinc), 3 (windowed jinc) or DEFAULT.',ErrStat,ErrMsg,RoutineName)
+   END IF
    IF (.not.(ANY((/1,2/)==AWAE_InitInp%Mod_Projection))) CALL SetErrStat(ErrID_Fatal,'Mod_Projection needs to be 1 or 2',ErrStat,ErrMsg,RoutineName)
          
+   ! --- WAT      
+   IF (WD_InitInp%WAT_k_Def  <= 0.0_Reki) CALL SetErrStat(ErrID_Fatal,'WAT_k_Def  parameter must be positive.',ErrStat,ErrMsg,RoutineName)
+   IF (WD_InitInp%WAT_k_Grad <= 0.0_Reki) CALL SetErrStat(ErrID_Fatal,'WAT_k_Grad parameter must be positive.',ErrStat,ErrMsg,RoutineName)
+   
+!FIXME: can I add checks that the lidars are actually on the same continent?
    !--- LIDAR  ---
    if (p%NumLidar < 0_IntKi)  call SetErrStat(ErrID_Fatal,'Number of ground/fixed lidar installations must be >=0', ErrStat, ErrMsg, RoutineName )
-!FIXME: can I add checks that the lidars are actually on the same continent?
 
    !--- OUTPUT ---
    IF ( p%n_ChkptTime < 1_IntKi   ) CALL SetErrStat( ErrID_Fatal, 'ChkptTime must be greater than 0 seconds.', ErrStat, ErrMsg, RoutineName )
