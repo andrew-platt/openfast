@@ -460,6 +460,8 @@ SUBROUTINE BD_CheckRotMat(R, ErrStat, ErrMsg)
    do i = 1, 3
       ortho = equalrealnos(S(i), 1.0_BDKi)
       if (.not. ortho) then
+         CALL WrScr(trim(RoutineName)//"Passed invalid rotation matrix")
+         call WrMatrix(R,CU,'(ES22.12E3)','BD_CheckRotMat: rotation matrix')
          CALL SetErrStat(ErrID_Fatal, "Passed invalid rotation matrix", ErrStat, ErrMsg, RoutineName)
          if (ErrStat >= AbortErrLev) return
       end if
