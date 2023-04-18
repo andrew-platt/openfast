@@ -73,6 +73,7 @@ add_library(openfastcpplib
   $<TARGET_OBJECTS:icefloelib_obj>
   $<TARGET_OBJECTS:openfast_postlib_obj>
   $<TARGET_OBJECTS:versioninfolib_obj>
+  $<TARGET_OBJECTS:lidarsimlib_obj>
 )
 
 set_property(TARGET openfastcpplib PROPERTY POSITION_INDEPENDENT_CODE ON)

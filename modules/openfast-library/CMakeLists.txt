@@ -46,6 +46,7 @@ target_link_libraries(openfast_prelib_obj
   icedynlib_obj
   icefloelib_obj
   maplib_obj
+  lidarsimlib_obj
 )
 
 add_library(openfast_prelib $<TARGET_OBJECTS:openfast_prelib_obj>)
@@ -68,7 +69,7 @@ target_link_libraries(openfast_prelib
   icedynlib
   icefloelib
   maplib
-  lidsimlib
+  lidarsimlib
 )
 
 
@@ -152,6 +153,7 @@ add_library(openfastlib SHARED
   $<TARGET_OBJECTS:icefloelib_obj>
   $<TARGET_OBJECTS:openfast_postlib_obj>
   $<TARGET_OBJECTS:versioninfolib_obj>
+  $<TARGET_OBJECTS:lidarsimlib_obj>
 )
 
 target_link_libraries(openfastlib
@@ -202,6 +204,7 @@ if(BUILD_OPENFAST_SIMULINK_API)
     $<TARGET_OBJECTS:icefloelib_obj>
     $<TARGET_OBJECTS:openfast_postlib_obj>
     $<TARGET_OBJECTS:versioninfolib_obj>
+    $<TARGET_OBJECTS:lidarsimlib_obj>
   )
 
   target_link_libraries(openfastlib_mex

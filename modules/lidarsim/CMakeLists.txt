@@ -18,17 +18,19 @@ if (GENERATE_TYPES)
   generate_f90_types(src/LidarSim_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/LidarSim_Types.f90)
 endif()
 
-set(LIDSIM_SOURCES
+set(LIDARSIM_SOURCES
   src/LidarSim.f90
   src/LidarSim_Subs.f90
   src/LidarSim_Types.f90
 )
 
-add_library(lidsimlib ${LIDSIM_SOURCES})
-target_link_libraries(lidsimlib nwtclibs)
+add_library(lidarsimlib_obj ${LIDARSIM_SOURCES})
+target_link_libraries(lidarsimlib_obj nwtclibs_obj)
 
+add_library(lidarsimlib $<TARGET_OBJECTS:lidarsimlib_obj>)
+target_link_libraries(lidarsimlib nwtclibs)
 
-install(TARGETS lidsimlib
+install(TARGETS lidarsimlib lidarsimlib_obj
   EXPORT "${CMAKE_PROJECT_NAME}Libraries"
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
