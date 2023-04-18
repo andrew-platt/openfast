@@ -58,12 +58,11 @@ add_executable(openfast_cpp src/FAST_Prog.cpp src/FastLibAPI.cpp
   $<TARGET_OBJECTS:versioninfolib_obj>
   $<TARGET_OBJECTS:lidarsimlib_obj>
 )
-
 set_property(TARGET openfast_cpp PROPERTY LINKER_LANGUAGE CXX)
 
 target_link_libraries(openfast_cpp   
-${LAPACK_LIBRARIES}
-${CMAKE_DL_LIBS}
+  ${LAPACK_LIBRARIES}
+  ${CMAKE_DL_LIBS}
 )
 
 if (OPENMP)
