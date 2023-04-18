@@ -13,7 +13,6 @@ Command-line syntax for InflowWind driver:
         options:  /ifw           --   treat <filename> as name of InflowWind input file (no driver input file)
 
         The following options will override values in the driver input file:
-<<<<<<< HEAD
                   /DT[#]          --  timestep
                   /TStart[#]      --  start time
                   /TSteps[#]      --  number of timesteps
@@ -29,27 +28,9 @@ Command-line syntax for InflowWind driver:
                   /hawc           --  convert wind file specified in InflowWind to HAWC format
                   /bladed         --  convert wind file specified in InflowWind to Bladed format
                   /vtk            --  convert wind file specified in InflowWind to VTK format
+                  /accel          --  output acceleration when processing a points file
                   /BoxExceedAllow --  set flag to extrapolate values of points outside FF wind box
                   /help           --  print this help menu and exit
-=======
-                  /DT[#]         --   timestep
-                  /TStart[#]     --   start time
-                  /TSteps[#]     --   number of timesteps
-                  /xrange[#:#]   --   range of x (#'s are reals)
-                  /yrange[#:#]   --   range of y
-                  /zrange[#:#]   --   range in z (ground = 0.0)
-                  /Dx[#]         --   spacing in x
-                  /Dy[#]         --   spacing in y
-                  /Dz[#]         --   spacing in z
-                  /points[FILE]  --   calculates at x,y,z coordinates specified in a white space delimited FILE
-                  /v             --   verbose output
-                  /vv            --   very verbose output
-                  /hawc          --   convert wind file specified in InflowWind to HAWC format
-                  /bladed        --   convert wind file specified in InflowWind to Bladed format
-                  /uniform       --   convert wind file specified in InflowWind to Uniform-wind format
-                  /vtk           --   convert wind file specified in InflowWind to VTK format
-                  /help          --   print this help menu and exit
->>>>>>> OpenFAST/dev
 
 ::
 
@@ -159,6 +140,17 @@ When converting from a full-field wind format to a uniform wind file, the follow
   1. The power-law exponent specified in InflowWind (if a power law wind profile is used to add to the turbulence with native-Bladed or HAWC2 files), or
   2. Calculated by using the mean wind speeds at two points: the reference (hub) height and the uppermost height on the grid.
 
+accel flag
+-------------------
+
+The ability to calculate the acceleration of the flow field was added to InflowWind
+to support the analysis of MHK, underwater, turbines. The acceleration is needed
+to calculate the mass effects of the fluid interacting with the rotor. Calculation of the
+acceleration is supported for Uniform/Steady Wind and grid based wind profiles (Turbsim,
+HAWC, and Bladed files). Enabling this flag causes the driver to output the flow field
+acceleration for points defined in the Points file in addition to the velocities at those
+same points.
+
 
 BoxExceedAllow flag
 -------------------
@@ -238,6 +230,8 @@ characteristics similar to the following plots.
   
 
 .. figure:: figs/FFWindExtrap--Tower.png
-   :widt: 90%
+   :width: 90%
 
    Extrapolation of wind values beyond the full field wind grid when tower data is present. The semi-transparent red planes indicate the edges of th e full-field wind grid, blue semi-transparent plane indicates the tower grid, and the red points indcate the data points from the wind grid and tower.  All other points shown on the surface are interpolated/extrapolated.
+
+
