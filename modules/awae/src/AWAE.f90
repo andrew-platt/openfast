@@ -877,8 +877,8 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
 
       ! Simple checks on timestep if lidar is used
    if ( (InitInp%Ldr_NumPts > 0) .and. (InitInp%InputFileData%dt_low > 0.5_DbKi) ) then
-      ErrStat2 = ErrID_Severe
-      ErrMsg2  = 'SEVERE WARNING: dt_low is too small for use with lidar measurements at the farm level. '// &
+      ErrStat2 = ErrID_Warn
+      ErrMsg2  = 'WARNING: dt_low is too large for use with high resolution lidar measurements at the farm level. '// &
          'Recommended value of dt_low < 0.5 s for lidar (adjust input turbulence resolution as necessary)'
       call SetErrStat( ErrStat2, ErrMsg2, errStat, errMsg, RoutineName )
       if (errStat >= AbortErrLev) return
