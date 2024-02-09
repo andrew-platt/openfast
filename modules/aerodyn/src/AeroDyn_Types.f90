@@ -99,6 +99,8 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: BladeRootOrientation      !< DCM reference orientation of blade roots (3x3 x NumBlades) [-]
     REAL(R8Ki) , DIMENSION(1:3)  :: NacellePosition      !< X-Y-Z reference position of nacelle [m]
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: NacelleOrientation      !< DCM reference orientation of nacelle [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: BladeMeshPosition      !< X-Y-Z reference position of each blade mesh (3 x NumBlades) [m]
+    REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: BladeMeshOrientation !< DCM reference orientation of each blade mesh [-]
     INTEGER(IntKi)  :: AeroProjMod = 1      !< Flag to switch between different projection models [-]
     INTEGER(IntKi)  :: AeroBEM_Mod = -1      !< Flag to switch between different BEM Model [-]
   END TYPE RotInitInputType
