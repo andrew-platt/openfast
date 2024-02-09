@@ -188,25 +188,25 @@ set(OPENFAST_MODULES
   version
   inflowwind
   aerodyn
-  aerodyn14
-  servodyn
-  elastodyn
-  beamdyn
-  subdyn
-  hydrodyn
-  orcaflex-interface
-  extptfm
-  feamooring
-  moordyn
-  icedyn
-  icefloe
-  wakedynamics
-  awae
-  map
-  turbsim
-  supercontroller
-  openfoam
-  openfast-library
+  # aerodyn14
+  # servodyn
+  # elastodyn
+  # beamdyn
+  # subdyn
+  # hydrodyn
+  # orcaflex-interface
+  # extptfm
+  # feamooring
+  # moordyn
+  # icedyn
+  # icefloe
+  # wakedynamics
+  # awae
+  # map
+  # turbsim
+  # supercontroller
+  # openfoam
+  # openfast-library
 )
 
 set(OPENFAST_REGISTRY_INCLUDES "" CACHE INTERNAL "Registry includes paths")
@@ -224,7 +224,7 @@ endforeach(IDIR IN ITEMS ${OPENFAST_MODULES})
 # Glue Code
 #-------------------------------------------------------------------------------
 
-add_subdirectory(glue-codes)
+# add_subdirectory(glue-codes)
 
 # Install fortran .mod files also to installation directory
 install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
