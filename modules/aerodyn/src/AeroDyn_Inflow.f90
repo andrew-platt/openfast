@@ -270,6 +270,8 @@ subroutine ADI_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg)
    errMsg  = ""
 
    ! --- CalcOutputs for IW (Sets u_AD%rotors(:)%InflowOnBlade, etc,  and m%IW%y)
+   call ADI_ADIW_Solve(t, u%AD, OtherState%AD, m%IW%u, m%IW, .true., errStat2, errMsg2); if(Failed()) return
+
    y%IW_WriteOutput(:) = m%IW%y%WriteOutput(:)
 
 
