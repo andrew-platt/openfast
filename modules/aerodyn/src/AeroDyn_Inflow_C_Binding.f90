@@ -1080,7 +1080,7 @@ SUBROUTINE AeroDyn_Inflow_C_CalcOutput(Time_C, &
       if (Failed())  return
 
    ! Set output force/moment array
-   call Set_OutputLoadArray( )
+   call Set_OutputLoadArray(ADI%y)
    MeshFrc_C(1:6*NumMeshPts) = reshape( real(tmpBldPtMeshFrc(1:6,1:NumMeshPts), c_float), (/6*NumMeshPts/) )
 
    ! Get the output channel info out of y
@@ -1548,7 +1548,7 @@ subroutine AD_TransferLoads( u_local, y_local, ErrStat3, ErrMsg3 )
    do i=1,Sim%WT(1)%NumBlades
       if ( y_local%AD%rotors(1)%BladeLoad(i)%Committed ) then
          if (debugverbose > 4)  call MeshPrintInfo( CU, y_local%AD%rotors(1)%BladeLoad(i), MeshName='AD%rotors('//trim(Num2LStr(1))//')%BladeLoad('//trim(Num2LStr(i))//')' )
-         call Transfer_Line2_to_Point( ADI%y%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
+         call Transfer_Line2_to_Point( y_local%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
                   ErrStat3, ErrMsg3, u_local%AD%rotors(1)%BladeMotion(i), BldPtMotionMesh )
          if (ErrStat3 >= AbortErrLev)  return
          BldPtLoadMesh%Force  = BldPtLoadMesh%Force  + BldPtLoadMesh_tmp%Force
@@ -1560,7 +1560,8 @@ end subroutine AD_TransferLoads
 
 !> Transfer the loads from the load mesh to the temporary array for output
 !! This routine is operating on module level data, hence few inputs
-subroutine Set_OutputLoadArray()
+subroutine Set_OutputLoadArray(y_local)
+   type(ADI_OutputType), intent(in )         :: y_local ! Only one input (probably at T)
    integer(IntKi)                            :: iNode
    integer(IntKi)                            :: jNode
    integer(IntKi)                            :: numMeshBld
