@@ -69,6 +69,8 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: fileFmt      !< Output format 1=Text, 2=Binary, 3=Both [-]
     INTEGER(IntKi)  :: wrVTK      !< 0= no vtk, 1=init only, 2=animation [-]
     INTEGER(IntKi)  :: WrVTK_Type      !< Flag for VTK output type (1=surface, 2=line, 3=both) [-]
+    real(DbKi)      :: WrVTK_dt   !< Write VTK time step
+    real(DbKi)      :: WrVTK_time !< Write VTK time
     character(1024)  :: Root      !< Output file rootname [-]
     character(1024)  :: VTK_OutFileRoot      !< Output file rootname for vtk [-]
     character(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputHdr      !< Channel headers [-]

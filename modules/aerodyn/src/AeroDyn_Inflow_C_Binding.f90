@@ -201,7 +201,8 @@ SUBROUTINE AeroDyn_Inflow_C_Init( ADinputFilePassed, ADinputFileString_C, ADinpu
                AeroProjMod_C,                                             &
                InterpOrder_C, DT_C, TMax_C,                               &
                storeHHVel, TransposeDCM_in,                               &
-               WrVTK_in, WrVTK_inType, VTKNacDim_in, VTKHubRad_in,        &
+               WrVTK_in, WrVTK_inType, WrVTK_inDt,                        &
+               VTKNacDim_in, VTKHubRad_in,                                &
                wrOuts_C, DT_Outs_C,                                       &
                HubPos_C, HubOri_C,                                        &
                NacPos_C, NacOri_C,                                        &
@@ -259,6 +260,7 @@ SUBROUTINE AeroDyn_Inflow_C_Init( ADinputFilePassed, ADinputFileString_C, ADinpu
    ! VTK
    integer(c_int),            intent(in   )  :: WrVTK_in                               !< Write VTK outputs [0: none, 1: init only, 2: animation]
    integer(c_int),            intent(in   )  :: WrVTK_inType                           !< Write VTK outputs as [1: surface, 2: lines, 3: both]
+   real(c_double),            intent(in   )  :: WrVTK_inDt                             !< Write VTK time step
    real(c_float),             intent(in   )  :: VTKNacDim_in(6)                        !< Nacelle dimension passed in for VTK surface rendering [0,y0,z0,Lx,Ly,Lz] (m)
    real(c_float),             intent(in   )  :: VTKHubrad_in                           !< Hub radius for VTK surface rendering
    integer(c_int),            intent(in   )  :: wrOuts_C                               !< Write ADI output file
@@ -374,6 +376,8 @@ SUBROUTINE AeroDyn_Inflow_C_Init( ADinputFilePassed, ADinputFileString_C, ADinpu
    ! VTK outputs
    WrOutputsData%WrVTK        = int(WrVTK_in,     IntKi)
    WrOutputsData%WrVTK_Type   = int(WrVTK_inType, IntKi)
+   WrOutputsData%WrVTK_dt     = real(WrVTK_inDt, DbKi)
+   WrOutputsData%WrVTK_time   = 0.0_DbKi
    WrOutputsData%VTKNacDim    = real(VTKNacDim_in, SiKi)
    WrOutputsData%VTKHubrad    = real(VTKHubrad_in, SiKi)
    WrOutputsData%VTKRefPoint  = (/ 0.0_ReKi, 0.0_ReKi, 0.0_ReKi /)    !TODO: should this be an input?
@@ -1090,7 +1094,13 @@ SUBROUTINE AeroDyn_Inflow_C_CalcOutput(Time_C, &
    ! write outputs
    !-------------------------------------------------------
    ! Write VTK if requested (animation=2)
-   if (WrOutputsData%WrVTK > 1_IntKi)    call WrVTK_Meshes(ADI%u(1)%AD%rotors(:),(/0.0_SiKi,0.0_SiKi,0.0_SiKi/),ErrStat2,ErrMsg2)
+   ! if (WrOutputsData%WrVTK > 1_IntKi)    call WrVTK_Meshes(ADI%u(1)%AD%rotors(:),(/0.0_SiKi,0.0_SiKi,0.0_SiKi/),ErrStat2,ErrMsg2)
+   if (WrOutputsData%WrVTK > 1_IntKi) then
+      if (Time >= WrOutputsData%WrVTK_time - 1.0e-6_DbKi) then
+         call WrVTK_Meshes(ADI%u(1)%AD%rotors(:),(/0.0_SiKi,0.0_SiKi,0.0_SiKi/),ErrStat2,ErrMsg2)
+         WrOutputsData%WrVTK_time = WrOutputsData%WrVTK_time + WrOutputsData%WrVTK_dt
+      endif
+   endif
 
    if (WrOutputsData%fileFmt > idFmtNone) then
 !FIXME: need some way to overwrite the correction timesteps (for text file)!
@@ -1517,8 +1527,8 @@ subroutine AD_SetInputMotion( u_local,             &
    !       if (ErrStat >= AbortErrLev)  return
    !    endif
    ! enddo
-   numMeshBld = NumMeshPts / numBlades
-   do i=1,numBlades
+   numMeshBld = NumMeshPts / Sim%WT(1)%numBlades
+   do i=1,Sim%WT(1)%numBlades
       do j=1,numMeshBld
          ii = (i - 1) * numMeshBld + j
          u_local%AD%rotors(1)%BladeMotion(i)%TranslationDisp(1:3,j) = BldPtMotionMesh%TranslationDisp(1:3,ii)
@@ -1571,8 +1581,8 @@ subroutine Set_OutputLoadArray(y_local)
    !    tmpBldPtMeshFrc(1:3,iNode)   = BldPtLoadMesh%Force (1:3,iNode)
    !    tmpBldPtMeshFrc(4:6,iNode)   = BldPtLoadMesh%Moment(1:3,iNode)
    ! enddo
-   numMeshBld = NumMeshPts / NumBlades
-   do iNode=1,NumBlades
+   numMeshBld = NumMeshPts / Sim%WT(1)%numBlades
+   do iNode=1,Sim%WT(1)%numBlades
       do jNode=1,numMeshBld
          ii = (iNode - 1) * numMeshBld + jNode
          tmpBldPtMeshFrc(1:3,ii)   = y_local%AD%rotors(1)%BladeLoad(iNode)%Force (1:3,jNode)
