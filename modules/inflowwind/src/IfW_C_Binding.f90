@@ -53,6 +53,13 @@ MODULE InflowWind_C_BINDING
    !  to be equivalent to ErrMsgLen + 1, but the logic exists to correctly handle different lengths of the strings
    integer(IntKi),   parameter            :: ErrMsgLen_C=1025  ! Numerical equivalent of ErrMsgLen + 1
 
+   !------------------------------------------------------------------------------------
+   !  Error handling
+   !     This must exactly match the value in the python-lib. If ErrMsgLen changes at
+   !     some point in the nwtc-library, this should be updated, but the logic exists
+   !     to correctly handle different lengths of the strings
+   integer(IntKi),   parameter            :: IntfStrLen  = 1025       ! length of other strings through the C interface
+
 
 
 CONTAINS
@@ -78,7 +85,7 @@ end subroutine SetErr
 !===============================================================================================================
 !--------------------------------------------- IFW INIT --------------------------------------------------------
 !===============================================================================================================
-SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, InputUniformString_C, InputUniformStringLength_C, NumWindPts_C, DT_C, NumChannels_C, OutputChannelNames_C, OutputChannelUnits_C, ErrStat_C, ErrMsg_C) BIND (C, NAME='IfW_C_Init')
+SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, NumWindPts_C, DT_C, NumChannels_C, OutputChannelNames_C, OutputChannelUnits_C, ErrStat_C, ErrMsg_C) BIND (C, NAME='IfW_C_Init')
    IMPLICIT NONE
 #ifndef IMPLICIT_DLLEXPORT
 !DEC$ ATTRIBUTES DLLEXPORT :: IfW_C_Init
@@ -86,8 +93,6 @@ SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, InputUniformSt
 #endif
     TYPE(C_PTR)                                    , INTENT(IN   )   :: InputFileString_C
     INTEGER(C_INT)                                 , INTENT(IN   )   :: InputFileStringLength_C
-    TYPE(C_PTR)                                    , INTENT(IN   )   :: InputUniformString_C
-    INTEGER(C_INT)                                 , INTENT(IN   )   :: InputUniformStringLength_C
     INTEGER(C_INT)                                 , INTENT(IN   )   :: NumWindPts_C
     REAL(C_DOUBLE)                                 , INTENT(IN   )   :: DT_C
     INTEGER(C_INT)                                 , INTENT(  OUT)   :: NumChannels_C
@@ -98,7 +103,6 @@ SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, InputUniformSt
 
     ! Local Variables
     CHARACTER(kind=C_char, len=InputFileStringLength_C),    POINTER  :: InputFileString            !< Input file as a single string with NULL chracter separating lines
-    CHARACTER(kind=C_char, len=InputUniformStringLength_C), POINTER  :: UniformFileString          !< Input file as a single string with NULL chracter separating lines -- Uniform wind file
 
     REAL(DbKi)                                                       :: TimeInterval
     INTEGER                                                          :: ErrStat                    !< aggregated error message
@@ -107,6 +111,7 @@ SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, InputUniformSt
     CHARACTER(ErrMsgLen)                                             :: ErrMsg2                    !< temporary error message from a call
     INTEGER                                                          :: i,j,k
     character(*), parameter                                          :: RoutineName = 'IfW_C_Init' !< for error handling
+    character(IntfStrLen)                                            :: TmpFileName       !< Temporary file name if not passing AD or IfW input file contents directly
 
    ! Initialize error handling
    ErrStat  =  ErrID_None
@@ -118,23 +123,18 @@ SUBROUTINE IfW_C_Init(InputFileString_C, InputFileStringLength_C, InputUniformSt
 
    ! Get fortran pointer to C_NULL_CHAR deliniated input file as a string 
    CALL C_F_pointer(InputFileString_C, InputFileString)
-   CALL C_F_pointer(InputUniformString_C, UniformFileString)
 
    ! Store string-inputs as type FileInfoType within InflowWind_InitInputType
-   CALL InitFileInfo(InputFileString, InitInp%PassedFileData, ErrStat2, ErrMsg2);   if (Failed())  return
-   InitInp%UseInputFile          = .FALSE.
-
-   ! store Uniform File strings if they are non-zero sized
-   if (len(UniformFileString) > 1) then 
-      CALL InitFileInfo(UniformFileString, InitInp%WindType2Data, ErrStat2, ErrMsg2);  if (Failed())  return
-      InitInp%WindType2UseInputFile = .FALSE.
-   else  ! Default to reading from disk
-      InitInp%WindType2UseInputFile = .TRUE.
-   endif
+   InitInp%UseInputFile   = .TRUE.            ! Read input info from a primary input file
+   i = min(IntfStrLen,InputFileStringLength_C)
+   TmpFileName = ''
+   TmpFileName(1:i) = InputFileString(1:i)
+   i = INDEX(TmpFileName,C_NULL_CHAR) - 1                ! if this has a c null character at the end...
+   if ( i > 0 ) TmpFileName = TmpFileName(1:I)           ! remove it
+   InitInp%InputFileName      = TmpFileName
 
    ! Set other inputs for calling InflowWind_Init
    InitInp%NumWindPoints         = NumWindPts_C              
-   InitInp%InputFileName         = "passed_ifw_file"         ! dummy
    InitInp%RootName              = "ifwRoot"                 ! used for making echo files
    TimeInterval                  = REAL(DT_C, DbKi)
 
