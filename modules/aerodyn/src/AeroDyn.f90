@@ -1189,7 +1189,7 @@ subroutine Init_u( u, p, p_AD, InputFileData, MHK, WtrDpth, InitInp, errStat, er
          positionL(3) = InputFileData%BladeProps(k)%BlSpn(  j)
             
             ! reference position of the jth node in the kth blade:
-         ! position = u%BladeRootMotion(k)%Position(:,1) + matmul(positionL,u%BladeRootMotion(k)%RefOrientation(:,:,1))  ! note that because positionL is a 1-D array, we're doing the transpose of matmul(transpose(u%BladeRootMotion(k)%RefOrientation),positionL)
+         position = u%BladeRootMotion(k)%Position(:,1) + matmul(positionL,u%BladeRootMotion(k)%RefOrientation(:,:,1))  ! note that because positionL is a 1-D array, we're doing the transpose of matmul(transpose(u%BladeRootMotion(k)%RefOrientation),positionL)
 
             
             ! reference orientation of the jth node in the kth blade, relative to the root in the local blade coordinate system:
@@ -1199,12 +1199,12 @@ subroutine Init_u( u, p, p_AD, InputFileData, MHK, WtrDpth, InitInp, errStat, er
          orientationL = EulerConstruct( theta )
                                  
             ! reference orientation of the jth node in the kth blade
-         ! orientation = matmul( orientationL, u%BladeRootMotion(k)%RefOrientation(:,:,1) )
+         orientation = matmul( orientationL, u%BladeRootMotion(k)%RefOrientation(:,:,1) )
 
          ! Init u directly with seahowl blade motion information
-         ii = (k - 1) * InputFileData%BladeProps(k)%NumBlNds + j
-         position    = InitInp%BladeMeshPosition(:,ii)
-         orientation = InitInp%BladeMeshOrientation(:,:,ii)
+         ! ii = (k - 1) * InputFileData%BladeProps(k)%NumBlNds + j
+         ! position    = InitInp%BladeMeshPosition(:,ii)
+         ! orientation = InitInp%BladeMeshOrientation(:,:,ii)
 
             
          call MeshPositionNode(u%BladeMotion(k), j, position, errStat2, errMsg2, orientation)

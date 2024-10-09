@@ -461,21 +461,6 @@ SUBROUTINE AeroDyn_Inflow_C_Init( ADinputFilePassed, ADinputFileString_C, ADinpu
    tmpBldPtMeshPos(    1:3,1:NumMeshPts) = reshape( real(InitMeshPos_C(1:3*NumMeshPts),ReKi), (/  3,NumMeshPts/) )
    tmpBldPtMeshOri(1:3,1:3,1:NumMeshPts) = reshape( real(InitMeshOri_C(1:9*NumMeshPts),ReKi), (/3,3,NumMeshPts/) )
 
-   ! Init balde mesh via InitInp to pass directly meshinfo from seahowl to aerodyn
-   call AllocAry(InitInp%AD%rotors(1)%BladeMeshPosition,       3, NumMeshPts, 'BldMeshPos', errStat2, errMsg2 ); if (Failed()) return
-   call AllocAry(InitInp%AD%rotors(1)%BladeMeshOrientation, 3, 3, NumMeshPts, 'BldMeshOri', errStat2, errMsg2 ); if (Failed()) return
-   InitInp%AD%rotors(1)%BladeMeshPosition    = reshape( real(InitMeshPos_C(1:3*NumMeshPts),ReKi), (/  3,NumMeshPts/) )
-   InitInp%AD%rotors(1)%BladeMeshOrientation = reshape( real(InitMeshOri_C(1:9*NumMeshPts),ReKi), (/3,3,NumMeshPts/) )
-   if (TransposeDCM) then
-      do i=1,NumMeshPts
-         InitInp%AD%rotors(1)%BladeMeshOrientation(1:3,1:3,i) = transpose(InitInp%AD%rotors(1)%BladeMeshOrientation(1:3,1:3,i))
-      enddo
-   endif
-
-   do i=1,NumMeshPts
-      call OrientRemap(InitInp%AD%rotors(1)%BladeMeshOrientation(1:3,1:3,i))
-   enddo
-
    !----------------------------------------------------
    ! Allocate input array u and corresponding InputTimes
    !----------------------------------------------------
@@ -1084,7 +1069,7 @@ SUBROUTINE AeroDyn_Inflow_C_CalcOutput(Time_C, &
       if (Failed())  return
 
    ! Set output force/moment array
-   call Set_OutputLoadArray(ADI%y)
+   call Set_OutputLoadArray()
    MeshFrc_C(1:6*NumMeshPts) = reshape( real(tmpBldPtMeshFrc(1:6,1:NumMeshPts), c_float), (/6*NumMeshPts/) )
 
    ! Get the output channel info out of y
@@ -1521,27 +1506,11 @@ subroutine AD_SetInputMotion( u_local,             &
    enddo
 
    ! Blade mesh
-   ! do i=1,Sim%WT(1)%numBlades
-   !    if ( u_local%AD%rotors(1)%BladeMotion(i)%Committed ) then
-   !       call Transfer_Point_to_Line2( BldPtMotionMesh, u_local%AD%rotors(1)%BladeMotion(i), Map_BldPtMotion_2_AD_Blade(i), ErrStat, ErrMsg )
-   !       if (ErrStat >= AbortErrLev)  return
-   !    endif
-   ! enddo
-   numMeshBld = NumMeshPts / Sim%WT(1)%numBlades
    do i=1,Sim%WT(1)%numBlades
-      do j=1,numMeshBld
-         ii = (i - 1) * numMeshBld + j
-         u_local%AD%rotors(1)%BladeMotion(i)%TranslationDisp(1:3,j) = BldPtMotionMesh%TranslationDisp(1:3,ii)
-         u_local%AD%rotors(1)%BladeMotion(i)%Orientation(1:3,1:3,j) = BldPtMotionMesh%Orientation(1:3,1:3,ii)
-         u_local%AD%rotors(1)%BladeMotion(i)%TranslationVel(1:3,j)  = BldPtMotionMesh%TranslationVel(1:3,ii)
-         u_local%AD%rotors(1)%BladeMotion(i)%RotationVel(1:3,j)     = BldPtMotionMesh%RotationVel(1:3,ii)
-         u_local%AD%rotors(1)%BladeMotion(i)%TranslationAcc(1:3,j)  = BldPtMotionMesh%TranslationAcc(1:3,ii)
-         ! u_local%AD%rotors(1)%BladeMotion(i)%RotationAcc (1:3,j) = BldPtMotionMesh%RotationAcc(1:3,ii)  ! Rotational acc not included
-         call OrientRemap(u_local%AD%rotors(1)%BladeMotion(i)%Orientation(1:3,1:3,j))
-         if (TransposeDCM) then
-            u_local%AD%rotors(1)%BladeMotion(i)%Orientation(1:3,1:3,j) = transpose(u_local%AD%rotors(1)%BladeMotion(i)%Orientation(1:3,1:3,j))
-         endif
-      enddo
+      if ( u_local%AD%rotors(1)%BladeMotion(i)%Committed ) then
+         call Transfer_Point_to_Line2( BldPtMotionMesh, u_local%AD%rotors(1)%BladeMotion(i), Map_BldPtMotion_2_AD_Blade(i), ErrStat, ErrMsg )
+         if (ErrStat >= AbortErrLev)  return
+      endif
    enddo
 end subroutine AD_SetInputMotion
 
@@ -1558,7 +1527,7 @@ subroutine AD_TransferLoads( u_local, y_local, ErrStat3, ErrMsg3 )
    do i=1,Sim%WT(1)%NumBlades
       if ( y_local%AD%rotors(1)%BladeLoad(i)%Committed ) then
          if (debugverbose > 4)  call MeshPrintInfo( CU, y_local%AD%rotors(1)%BladeLoad(i), MeshName='AD%rotors('//trim(Num2LStr(1))//')%BladeLoad('//trim(Num2LStr(i))//')' )
-         call Transfer_Line2_to_Point( y_local%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
+         call Transfer_Line2_to_Point( ADI%y%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
                   ErrStat3, ErrMsg3, u_local%AD%rotors(1)%BladeMotion(i), BldPtMotionMesh )
          if (ErrStat3 >= AbortErrLev)  return
          BldPtLoadMesh%Force  = BldPtLoadMesh%Force  + BldPtLoadMesh_tmp%Force
@@ -1570,24 +1539,15 @@ end subroutine AD_TransferLoads
 
 !> Transfer the loads from the load mesh to the temporary array for output
 !! This routine is operating on module level data, hence few inputs
-subroutine Set_OutputLoadArray(y_local)
-   type(ADI_OutputType), intent(in )         :: y_local ! Only one input (probably at T)
+subroutine Set_OutputLoadArray()
    integer(IntKi)                            :: iNode
    integer(IntKi)                            :: jNode
    integer(IntKi)                            :: numMeshBld
    integer(IntKi)                            :: ii
    ! Set mesh corresponding to input motions
-   ! do iNode=1,NumMeshPts
-   !    tmpBldPtMeshFrc(1:3,iNode)   = BldPtLoadMesh%Force (1:3,iNode)
-   !    tmpBldPtMeshFrc(4:6,iNode)   = BldPtLoadMesh%Moment(1:3,iNode)
-   ! enddo
-   numMeshBld = NumMeshPts / Sim%WT(1)%numBlades
-   do iNode=1,Sim%WT(1)%numBlades
-      do jNode=1,numMeshBld
-         ii = (iNode - 1) * numMeshBld + jNode
-         tmpBldPtMeshFrc(1:3,ii)   = y_local%AD%rotors(1)%BladeLoad(iNode)%Force (1:3,jNode)
-         tmpBldPtMeshFrc(4:6,ii)   = y_local%AD%rotors(1)%BladeLoad(iNode)%Moment(1:3,jNode)
-      enddo
+   do iNode=1,NumMeshPts
+      tmpBldPtMeshFrc(1:3,iNode)   = BldPtLoadMesh%Force (1:3,iNode)
+      tmpBldPtMeshFrc(4:6,iNode)   = BldPtLoadMesh%Moment(1:3,iNode)
    enddo
 end subroutine Set_OutputLoadArray
 
