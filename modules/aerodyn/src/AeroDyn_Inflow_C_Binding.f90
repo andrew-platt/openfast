@@ -797,7 +797,7 @@ CONTAINS
 
       call MeshCommit ( BldPtMotionMesh, ErrStat3, ErrMsg3 )
          if (ErrStat3 >= AbortErrLev) return
-      BldPtMotionMesh%RemapFlag  = .TRUE.
+      BldPtMotionMesh%RemapFlag  = .FALSE.
 
       ! For checking the mesh, uncomment this.
       !     note: CU is is output unit (platform dependent).
@@ -849,7 +849,7 @@ CONTAINS
                      Force    = .TRUE.             ,&
                      Moment   = .TRUE.             )
          if (ErrStat3 >= AbortErrLev) return
-      BldPtLoadMesh%RemapFlag  = .TRUE.
+      BldPtLoadMesh%RemapFlag  = .FALSE.
 
       ! Temp mesh for load transfer
       CALL MeshCopy( SrcMesh  = BldPtLoadMesh      ,&
@@ -861,7 +861,7 @@ CONTAINS
                      Force    = .TRUE.             ,&
                      Moment   = .TRUE.             )
          if (ErrStat3 >= AbortErrLev) return
-      BldPtLoadMesh_tmp%RemapFlag  = .TRUE.
+      BldPtLoadMesh_tmp%RemapFlag  = .FALSE.
 
 
       ! For checking the mesh
@@ -1511,6 +1511,7 @@ subroutine AD_SetInputMotion( u_local,             &
    do i=1,Sim%WT(1)%numBlades
       if ( u_local%AD%rotors(1)%BladeMotion(i)%Committed ) then
          call Transfer_Line2_to_Line2( BldPtMotionMesh, u_local%AD%rotors(1)%BladeMotion(i), Map_BldPtMotion_2_AD_Blade(i), ErrStat, ErrMsg )
+         u_local%AD%rotors(1)%BladeMotion(i)%RemapFlag  = .FALSE.
          if (ErrStat >= AbortErrLev)  return
       endif
    enddo
@@ -1532,6 +1533,7 @@ subroutine AD_TransferLoads( u_local, y_local, ErrStat3, ErrMsg3 )
          call Transfer_Line2_to_Line2( ADI%y%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
                   ErrStat3, ErrMsg3, u_local%AD%rotors(1)%BladeMotion(i), BldPtMotionMesh )
          if (ErrStat3 >= AbortErrLev)  return
+         ADI%y%AD%rotors(1)%BladeLoad(i)%RemapFlag  = .FALSE.
          BldPtLoadMesh%Force  = BldPtLoadMesh%Force  + BldPtLoadMesh_tmp%Force
          BldPtLoadMesh%Moment = BldPtLoadMesh%Moment + BldPtLoadMesh_tmp%Moment
       endif
