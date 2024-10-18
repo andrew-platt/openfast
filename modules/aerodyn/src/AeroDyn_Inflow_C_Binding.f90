@@ -789,8 +789,10 @@ CONTAINS
                                  Orient                     )  ! orientation
             if (ErrStat3 >= AbortErrLev) return
 !FIXME: if we need to switch to line2 instead of point, do that here.
-         call MeshConstructElement ( BldPtMotionMesh, ELEMENT_POINT, ErrStat3, ErrMsg3, iNode )
-            if (ErrStat3 >= AbortErrLev) return
+         if (iNode > 1) then
+            ! This assumes that the first point is the root
+            call MeshConstructElement ( BldPtMotionMesh, ELEMENT_LINE2, ErrStat2, ErrMsg2, iNode-1, iNode )
+         end if
       enddo
 
       call MeshCommit ( BldPtMotionMesh, ErrStat3, ErrMsg3 )
@@ -1508,7 +1510,7 @@ subroutine AD_SetInputMotion( u_local,             &
    ! Blade mesh
    do i=1,Sim%WT(1)%numBlades
       if ( u_local%AD%rotors(1)%BladeMotion(i)%Committed ) then
-         call Transfer_Point_to_Line2( BldPtMotionMesh, u_local%AD%rotors(1)%BladeMotion(i), Map_BldPtMotion_2_AD_Blade(i), ErrStat, ErrMsg )
+         call Transfer_Line2_to_Line2( BldPtMotionMesh, u_local%AD%rotors(1)%BladeMotion(i), Map_BldPtMotion_2_AD_Blade(i), ErrStat, ErrMsg )
          if (ErrStat >= AbortErrLev)  return
       endif
    enddo
@@ -1527,7 +1529,7 @@ subroutine AD_TransferLoads( u_local, y_local, ErrStat3, ErrMsg3 )
    do i=1,Sim%WT(1)%NumBlades
       if ( y_local%AD%rotors(1)%BladeLoad(i)%Committed ) then
          if (debugverbose > 4)  call MeshPrintInfo( CU, y_local%AD%rotors(1)%BladeLoad(i), MeshName='AD%rotors('//trim(Num2LStr(1))//')%BladeLoad('//trim(Num2LStr(i))//')' )
-         call Transfer_Line2_to_Point( ADI%y%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
+         call Transfer_Line2_to_Line2( ADI%y%AD%rotors(1)%BladeLoad(i), BldPtLoadMesh_tmp, Map_AD_BldLoad_P_2_BldPtLoad(i), &
                   ErrStat3, ErrMsg3, u_local%AD%rotors(1)%BladeMotion(i), BldPtMotionMesh )
          if (ErrStat3 >= AbortErrLev)  return
          BldPtLoadMesh%Force  = BldPtLoadMesh%Force  + BldPtLoadMesh_tmp%Force
