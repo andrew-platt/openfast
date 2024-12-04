@@ -151,6 +151,7 @@ END SUBROUTINE U_ReadInput
    ErrMsg  = ""
       
    UnEc = -1
+   UnIn = -1   ! set to -1 at start to find valid unit numbers in Open* calls
    Echo = .FALSE.   
    CALL GetPath( InputFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
    
@@ -160,15 +161,7 @@ END SUBROUTINE U_ReadInput
    !   IF ( ErrStat >= AbortErrLev ) RETURN   
       
    
-      ! Get an available unit number for the file.
-
-   CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-      CALL CheckError( ErrStat2, ErrMsg2 )
-      IF ( ErrStat >= AbortErrLev ) RETURN
-
-
       ! Open the Primary input file.
-
    CALL OpenFInpFile ( UnIn, InputFile, ErrStat2, ErrMsg2 )
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -188,7 +181,7 @@ END SUBROUTINE U_ReadInput
          END DO
    END DO
       
-   CLOSE ( UnIn )
+   CLOSE(UnIn);   UnIn = -1
    RETURN
 
 
@@ -217,7 +210,7 @@ CONTAINS
          ! Clean up if we're going to return on error: close file, deallocate local arrays
          !.........................................................................................................................
          IF ( ErrStat >= AbortErrLev ) THEN
-            CLOSE( UnIn )
+            CLOSE(UnIn);   UnIn = -1
 !            IF ( UnEc > 0 ) CLOSE ( UnEc )
          END IF
 
@@ -262,6 +255,7 @@ CONTAINS
    ErrMsg  = ""
       
    UnEc = -1
+   UnIn = -1   ! set to -1 at start to find valid unit numbers in Open* calls
    Echo = .FALSE.   
    CALL GetPath( InputFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
    
@@ -271,15 +265,7 @@ CONTAINS
    !   IF ( ErrStat >= AbortErrLev ) RETURN   
       
    
-      ! Get an available unit number for the file.
-
-   CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-      CALL CheckError( ErrStat2, ErrMsg2 )
-      IF ( ErrStat >= AbortErrLev ) RETURN
-
-
       ! Open the Primary input file.
-
    CALL OpenFInpFile ( UnIn, InputFile, ErrStat2, ErrMsg2 )
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -298,7 +284,7 @@ CONTAINS
       END DO
    END DO
    
-   CLOSE ( UnIn )
+   CLOSE(UnIn);   UnIn = -1
    RETURN
 
 
@@ -327,7 +313,7 @@ CONTAINS
          ! Clean up if we're going to return on error: close file, deallocate local arrays
          !.........................................................................................................................
          IF ( ErrStat >= AbortErrLev ) THEN
-            CLOSE( UnIn )
+            CLOSE(UnIn);   UnIn = -1
 !            IF ( UnEc > 0 ) CLOSE ( UnEc )
          END IF
 
@@ -372,6 +358,7 @@ CONTAINS
    ErrMsg  = ""
       
    UnEc = -1
+   UnIn = -1   ! set to -1 at start to find valid unit numbers in Open* calls
    Echo = .FALSE.   
    CALL GetPath( InputFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
    
@@ -381,15 +368,7 @@ CONTAINS
    !   IF ( ErrStat >= AbortErrLev ) RETURN   
       
    
-      ! Get an available unit number for the file.
-
-   CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-      CALL CheckError( ErrStat2, ErrMsg2 )
-      IF ( ErrStat >= AbortErrLev ) RETURN
-
-
       ! Open the Primary input file.
-
    CALL OpenFInpFile ( UnIn, InputFile, ErrStat2, ErrMsg2 )
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -407,7 +386,7 @@ CONTAINS
          AAvec(J,I) = TmpRAry3(J)
       END DO
    END DO
-   CLOSE ( UnIn )
+   CLOSE(UnIn);   UnIn = -1
    RETURN
 
 
@@ -436,7 +415,7 @@ CONTAINS
          ! Clean up if we're going to return on error: close file, deallocate local arrays
          !.........................................................................................................................
          IF ( ErrStat >= AbortErrLev ) THEN
-            CLOSE( UnIn )
+            CLOSE(UnIn);   UnIn = -1
 !            IF ( UnEc > 0 ) CLOSE ( UnEc )
          END IF
 
@@ -481,6 +460,7 @@ END SUBROUTINE ReadAngAccelFile
    ErrMsg  = ""
       
    UnEc = -1
+   UnIn = -1   ! set to -1 at start to find valid unit numbers in Open* calls
    Echo = .FALSE.   
    CALL GetPath( InputFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
    
@@ -490,15 +470,7 @@ END SUBROUTINE ReadAngAccelFile
    !   IF ( ErrStat >= AbortErrLev ) RETURN   
       
    
-      ! Get an available unit number for the file.
-
-   CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-      CALL CheckError( ErrStat2, ErrMsg2 )
-      IF ( ErrStat >= AbortErrLev ) RETURN
-
-
       ! Open the Primary input file.
-
    CALL OpenFInpFile ( UnIn, InputFile, ErrStat2, ErrMsg2 )
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -518,7 +490,7 @@ END SUBROUTINE ReadAngAccelFile
       END DO
    END DO
    
-   CLOSE ( UnIn )
+   CLOSE(UnIn);   UnIn = -1
    RETURN
 
 
@@ -547,7 +519,7 @@ CONTAINS
          ! Clean up if we're going to return on error: close file, deallocate local arrays
          !.........................................................................................................................
          IF ( ErrStat >= AbortErrLev ) THEN
-            CLOSE( UnIn )
+            CLOSE(UnIn);   UnIn = -1
 !            IF ( UnEc > 0 ) CLOSE ( UnEc )
          END IF
 
@@ -571,17 +543,13 @@ SUBROUTINE StC_OpenOutputFile(OutputFile,UnIn,ErrStat,ErrMsg)
    
    ErrStat = ErrID_None
    ErrMsg  = ''
+   UnIn    = -1   ! set to -1 at start to find valid unit numbers in Open* calls
    !OutputFile = 'StC_Output_Data.txt'
    !Fmt = "F10.2))/"
    
-   CALL GetNewUnit( UnIn, ErrStat, ErrMsg )
-      !CALL CheckError( ErrStat, ErrMsg)
-      !IF ( ErrStat >= AbortErrLev ) RETURN
-
-
       ! Open the output file.
-
    CALL OpenFOutFile ( UnIn, OutputFile, ErrStat, ErrMsg )
+   if (ErrStat>=AbortErrLev) return
    Header1 = "-------------- StrucCtrl Output ------------------------------"
    Header2 = "x    dxdt     y     dydt       fx       fy     fz       mx       my       mz"
    
