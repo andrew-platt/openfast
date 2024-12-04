@@ -24,6 +24,10 @@ MODULE NWTC_IO
    USE NWTC_Library_Types  ! ProgDesc and other types with copy and other routines for those types
    USE IEEE_ARITHMETIC
 
+#ifdef _OPENMP
+   use OMP_LIB
+#endif
+
    IMPLICIT  NONE
 
 !=======================================================================
@@ -1860,7 +1864,6 @@ END SUBROUTINE CheckR8Var
    END DO
 
    UnIn = Un
-
    RETURN
    END SUBROUTINE GetNewUnit
 !=======================================================================
@@ -2303,32 +2306,23 @@ END SUBROUTINE CheckR8Var
    END SUBROUTINE NWTC_DisplaySyntax
 !=======================================================================
 !> This routine opens a binary input file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenBInpFile ( Un, InFile, ErrStat, ErrMsg )
-
-   IMPLICIT                        NONE
-
-      ! Argument declarations.
-
-   INTEGER(IntKi), INTENT(IN)       :: Un                                          !< Logical unit for the input file.
+   INTEGER(IntKi), INTENT(INOUT)    :: Un                                          !< Logical unit for the input file.
    INTEGER(IntKi), INTENT(OUT)      :: ErrStat                                     !< Error status: returns "fatal" if the file doesn't exist or can't be opened
    CHARACTER(*),   INTENT(OUT)      :: ErrMsg                                      !< Error message
    CHARACTER(*),   INTENT(IN)       :: InFile                                      !< Name of the input file.
 
-
       ! Local declarations.
-
       ! NOTE: Do not explicitly declare the precision of this variable [as in
       !       LOGICAL(1)] so that the statements using this variable work with
       !       any compiler:
    LOGICAL                      :: Exists                                       ! Flag indicating whether or not a file Exists.
 
-
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-
       ! See if input file Exists.
-
    INQUIRE ( FILE=TRIM( InFile ) , EXIST=Exists )
 
    IF ( .NOT. Exists )  THEN
@@ -2337,18 +2331,21 @@ END SUBROUTINE CheckR8Var
       RETURN
    END IF
 
-
       ! Open input file.  Make sure it worked.
-   OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='UNFORMATTED', ACCESS='STREAM', IOSTAT=ErrStat, ACTION='READ' )
-
-   IF ( ErrStat /= 0 ) THEN
-      ErrStat = ErrID_Fatal
-      ErrMsg  = 'OpenBInpFile:Cannot open file "'//TRIM( InFile )//'" for reading. Another program may have locked it.'
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg  = ''
-   END IF
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='UNFORMATTED', ACCESS='STREAM', IOSTAT=ErrStat, ACTION='READ' )
+ 
+      IF ( ErrStat /= 0 ) THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg  = 'OpenBInpFile:Cannot open file "'//TRIM( InFile )//'" for reading. Another program may have locked it.'
+      ELSE
+         ErrStat = ErrID_None
+         ErrMsg  = ''
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenBInpFile
@@ -2356,49 +2353,46 @@ END SUBROUTINE CheckR8Var
 !> This routine opens a binary output file with stream access,
 !! implemented in standrad Fortran 2003.
 !! Valid in gfortran 4.6.1 and IVF 10.1 and later
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenBOutFile ( Un, OutFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER(IntKi),  INTENT(IN)       :: Un                                  !< Logical unit for the output file
+   INTEGER(IntKi),  INTENT(INOUT)    :: Un                                  !< Logical unit for the output file
    INTEGER(IntKi),  INTENT(OUT)      :: ErrStat                             !< Error status
    CHARACTER(*),    INTENT(OUT)      :: ErrMsg                              !< Error message
    CHARACTER(*),    INTENT(IN)       :: OutFile                             !< Name of the output file
 
-
+   ErrStat = ErrID_None
+   ErrMsg  = ""
 
       ! Open output file.  Make sure it worked.
-   OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='UNFORMATTED' , ACCESS='STREAM', IOSTAT=ErrStat, ACTION='WRITE' )
-
-   IF ( ErrStat /= 0 ) THEN
-      ErrStat = ErrID_Fatal
-      ErrMsg  = 'OpenBOutFile:Cannot open file "'//TRIM( OutFile )//'". Another program may have locked it for writing.' &
-                //' (IOSTAT is '//TRIM(Num2LStr(ErrStat))//')'
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg  = ''
-   END IF
-
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='UNFORMATTED' , ACCESS='STREAM', IOSTAT=ErrStat, ACTION='WRITE' )
+ 
+      IF ( ErrStat /= 0 ) THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg  = 'OpenBOutFile:Cannot open file "'//TRIM( OutFile )//'". Another program may have locked it for writing.' &
+                   //' (IOSTAT is '//TRIM(Num2LStr(ErrStat))//')'
+      ELSE
+         ErrStat = ErrID_None
+         ErrMsg  = ''
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenBOutFile
 !=======================================================================
 !> This routine opens a formatted output file for the echo file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenEcho ( Un, OutFile, ErrStat, ErrMsg, ProgVer )
-
-      ! Argument declarations.
-
    INTEGER,        INTENT(INOUT)         :: Un                                        !< Logical unit for the input file.
    CHARACTER(*),   INTENT(IN)            :: OutFile                                   !< Name of the input file.
    INTEGER(IntKi), INTENT(OUT)           :: ErrStat                                   !< Error status
    CHARACTER(*),   INTENT(OUT)           :: ErrMsg                                    !< Error message
-
    TYPE(ProgDesc), INTENT(IN),  OPTIONAL :: ProgVer                                   !< Program version info to display in echo file
 
-
       ! local variables
-
    INTEGER(IntKi)                        :: ErrStat2                                   ! Temporary Error status
    CHARACTER(ErrMsgLen)                  :: ErrMsg2                                    ! Temporary Error message
    CHARACTER(*),PARAMETER                :: RoutineName = 'OpenEcho'
@@ -2406,63 +2400,41 @@ END SUBROUTINE CheckR8Var
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-
-      ! Get a unit number for the echo file:
-
-   IF ( Un < 0 ) THEN
-      CALL GetNewUnit( Un, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2, ErrMsg2,ErrStat, ErrMsg, RoutineName )
-   END IF
-
-
       ! Open the file for writing:
 
    CALL OpenFOutFile( Un, OutFile, ErrStat2, ErrMsg2 )
       CALL SetErrStat(ErrStat2, ErrMsg2,ErrStat, ErrMsg, RoutineName )
-      IF ( ErrStat >= AbortErrLev ) RETURN
-
-
+   IF ( ErrStat >= AbortErrLev ) RETURN
+   
       ! Write a heading line to the file
-
    IF ( PRESENT( ProgVer ) ) THEN
-
       WRITE (Un,'(/,A)', IOSTAT=ErrStat2  )  'This file of echoed input was generated by '//TRIM(GetNVD(ProgVer))// &
                             ' on '//CurDate()//' at '//CurTime()//'.'
-
       IF ( ErrStat2 /= 0 ) THEN
          CALL SetErrStat(ErrID_Info, 'Could not write header information to the file.', ErrStat, ErrMsg, RoutineName )
       END IF
-
    END IF
-
 
    RETURN
    END SUBROUTINE OpenEcho
 !=======================================================================
 !> This routine opens a formatted input file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenFInpFile ( Un, InFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER,        INTENT(IN)          :: Un                                           !< Logical unit for the input file.
+   INTEGER,        INTENT(INOUT)       :: Un                                           !< Logical unit for the input file.
    CHARACTER(*),   INTENT(IN)          :: InFile                                       !< Name of the input file.
    INTEGER(IntKi), INTENT(OUT)         :: ErrStat                                      !< Error status
    CHARACTER(*),   INTENT(OUT)         :: ErrMsg                                       !< Error message
 
-
       ! Local declarations.
-
    INTEGER                      :: IOS                                                 ! I/O status of OPEN.
-
    LOGICAL                      :: Exists                                              ! Flag indicating whether or not a file Exists.
    CHARACTER(*), PARAMETER      :: RoutineName = 'OpenFInpFile'
-   
    
    ErrStat = ErrID_None
    ErrMsg  = ""
 
       ! See if input file Exists.
-
    INQUIRE ( FILE=TRIM( InFile ) , EXIST=Exists )
 
    IF ( .NOT. Exists )  THEN
@@ -2470,279 +2442,257 @@ END SUBROUTINE CheckR8Var
    ELSE
 
       ! Open input file.  Make sure it worked.
-
-      OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='FORMATTED', IOSTAT=IOS, ACTION='READ' )
-
-      IF ( IOS /= 0 )  THEN
-         CALL SetErrStat( ErrID_Fatal, 'Cannot open file "'//TRIM( InFile )//'".', ErrStat,ErrMsg,RoutineName)
-      END IF
+      !$OMP critical
+      if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+      if (ErrStat==ErrID_None) then
+         OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='FORMATTED', IOSTAT=IOS, ACTION='READ' )
+ 
+         IF ( IOS /= 0 )  THEN
+            CALL SetErrStat( ErrID_Fatal, 'Cannot open file "'//TRIM( InFile )//'".', ErrStat,ErrMsg,RoutineName)
+         END IF
+      endif
+      !$OMP end critical
 
    END IF
-
 
    RETURN
    END SUBROUTINE OpenFInpFile
 !=======================================================================
 !> This routine opens a formatted output file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenFOutFile ( Un, OutFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)                   :: Un                                          !< Logical unit for the output file.
+   INTEGER, INTENT(INOUT)                :: Un                                          !< Logical unit for the output file.
    CHARACTER(*), INTENT(IN)              :: OutFile                                     !< Name of the output file.
-
    INTEGER(IntKi), INTENT(OUT)           :: ErrStat                                     !< Error status
    CHARACTER(*),   INTENT(OUT)           :: ErrMsg                                      !< Error message
 
-
-
       ! Local declarations.
-
    INTEGER                                :: IOS                                         ! I/O status of OPEN
    CHARACTER(*), PARAMETER                :: RoutineName = 'OpenFOutFile'
 
-   
+   ErrStat = ErrID_None
+   ErrMsg  = ""
+
       ! Open output file.  Make sure it worked.
-
-   OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
-
-
-   IF ( IOS /= 0 )  THEN
-      ErrStat = ErrID_Fatal
-      ErrMsg  = 'OpenFOutFile:Cannot open file "'//TRIM( OutFile )//&
-         '". Another program like MS Excel may have locked it for writing.'
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg  = ""      
-   END IF
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
+ 
+      IF ( IOS /= 0 )  THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg  = 'OpenFOutFile:Cannot open file "'//TRIM( OutFile )//&
+            '". Another program like MS Excel may have locked it for writing.'
+      ELSE
+         ErrStat = ErrID_None
+         ErrMsg  = ""      
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenFOutFile
 !=======================================================================
 !> This routine opens a formatted output file and returns a flag telling if it already existed.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenFUnkFile ( Un, OutFile, FailAbt, Failed, Exists, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)          :: Un                                           !< Logical unit for the output file.
+   INTEGER, INTENT(INOUT)       :: Un                                           !< Logical unit for the output file.
    INTEGER(IntKi), INTENT(OUT)  :: ErrStat                                      !< Error status: returns "fatal" if the file doesn't exist or can't be opened
    CHARACTER(*),   INTENT(OUT)  :: ErrMsg                                       !< Error message
-
    LOGICAL, INTENT(OUT)         :: Exists                                       !< Flag that indicates if the file already existedo.
    LOGICAL, INTENT(IN)          :: FailAbt                                      !< Flag that tells this routine to abort if the open fails.
    LOGICAL, INTENT(OUT)         :: Failed                                       !< Flag that indicates if the open failed.
-
    CHARACTER(*), INTENT(IN)     :: OutFile                                      !< Name of the output file.
 
-
       ! Local declarations.
-
    INTEGER                      :: IOS                                          ! I/O status of OPEN.
 
-
+   ErrStat = ErrID_None
+   ErrMsg  = ""
 
       ! Check to see if the file already exists.
-
    INQUIRE ( FILE=TRIM( OutFile ) , EXIST=Exists )   
 
-
       ! Open output file.  Make sure it worked.
-
-   OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS )
-
-
-   IF ( IOS /= 0 )  THEN
-      Failed = .TRUE.
-      ErrStat = ErrID_Fatal
-      ErrMsg = 'OpenFUnkFile:Cannot open file "'//TRIM( OutFile )//'".  Another program like MS Excel may have locked it for writing.'
-      IF ( FailAbt )  CALL ProgAbort ( TRIM(ErrMsg) )
-   ELSE
-      Failed = .FALSE.
-      ErrStat = ErrID_None
-      ErrMsg = ''
-   END IF
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS )
+ 
+      IF ( IOS /= 0 )  THEN
+         Failed = .TRUE.
+         ErrStat = ErrID_Fatal
+         ErrMsg = 'OpenFUnkFile:Cannot open file "'//TRIM( OutFile )//'".  Another program like MS Excel may have locked it for writing.'
+         IF ( FailAbt )  CALL ProgAbort ( TRIM(ErrMsg) )
+      ELSE
+         Failed = .FALSE.
+         ErrStat = ErrID_None
+         ErrMsg = ''
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenFUnkFile
 !=======================================================================
 !> This routine opens a formatted output file in append mode if it exists, otherwise opens a new file
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenFUnkFileAppend ( Un, OutFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)                   :: Un                                          ! Logical unit for the output file.
+   INTEGER, INTENT(INOUT)                :: Un                                          ! Logical unit for the output file.
    CHARACTER(*), INTENT(IN)              :: OutFile                                     ! Name of the output file.
-
    INTEGER(IntKi), INTENT(OUT), OPTIONAL :: ErrStat                                     ! Error status; if present, program does not abort on error
    CHARACTER(*),   INTENT(OUT), OPTIONAL :: ErrMsg                                      ! Error message
-
-
 
       ! Local declarations.
    LOGICAL                                :: FileExists                                  ! Does the file exist?
    INTEGER                                :: IOS                                         ! I/O status of OPEN
    CHARACTER(1024)                        :: Msg                                         ! Temporary error message
-
-
-      ! Open output file.  Make sure it worked.
+   integer                                :: ErrStat2
+   character(ErrMsgLen)                   :: ErrMsg2
 
    inquire(file=TRIM( OutFile ), exist=FileExists)
 
-   if (FileExists) then
-      OPEN( Un, FILE=TRIM( OutFile ), STATUS='OLD', POSITION='APPEND', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
+      ! Open output file.  Make sure it worked.
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat2,ErrMsg2)
+   if (ErrStat2/=ErrID_None) then
+      IF ( PRESENT(ErrStat) )  ErrStat = ErrStat2
+      IF ( PRESENT(ErrMsg)  )  ErrMsg  = ErrMsg2
    else
-      OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
-   end if
-
-
-   IF ( IOS /= 0 )  THEN
-
-      Msg = 'Cannot open file "'//TRIM( OutFile )//'".  Another program like MS Excel may have locked it for writing.'
-
-      IF ( PRESENT(ErrStat) ) THEN
-         ErrStat = ErrID_Fatal
-         ErrMsg  = Msg
+      if (FileExists) then
+         OPEN( Un, FILE=TRIM( OutFile ), STATUS='OLD', POSITION='APPEND', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
+      else
+         OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
+      end if
+ 
+      IF ( IOS /= 0 )  THEN
+ 
+         Msg = 'Cannot open file "'//TRIM( OutFile )//'".  Another program like MS Excel may have locked it for writing.'
+ 
+         IF ( PRESENT(ErrStat) ) THEN
+            ErrStat = ErrID_Fatal
+            ErrMsg  = Msg
+         ELSE
+            CALL ProgAbort( ' '//Msg )
+         END IF
+ 
       ELSE
-         CALL ProgAbort( ' '//Msg )
+         IF ( PRESENT(ErrStat) )  ErrStat = ErrID_None
+         IF ( PRESENT(ErrMsg)  )  ErrMsg  = ""
       END IF
-
-   ELSE
-      IF ( PRESENT(ErrStat) )  ErrStat = ErrID_None
-      IF ( PRESENT(ErrMsg)  )  ErrMsg  = ""
-   END IF
-
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenFUnkFileAppend ! ( Un, OutFile [, ErrStat] [, ErrMsg] )
 !=======================================================================
 !>  This routine opens an unformatted input file of RecLen-byte data records
 !!  stored in Big Endian format.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenUInBEFile( Un, InFile, RecLen, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)           ::  Un                                         !< Logical unit for the input file
+   INTEGER, INTENT(INOUT)        ::  Un                                         !< Logical unit for the input file
    CHARACTER(*), INTENT(IN)      ::  InFile                                     !< Name of the input file
    INTEGER, INTENT(IN)           ::  RecLen                                     !< The input file's record length in bytes
    INTEGER(IntKi), INTENT(OUT)   ::  ErrStat                                    !< Error status: returns "fatal" if the file doesn't exist or can't be opened
    CHARACTER(*),   INTENT(OUT)   ::  ErrMsg                                     !< Error message
 
-
       ! Local declarations.
-
    LOGICAL                       :: Exists                                       ! Flag to indicate if a file exists
    LOGICAL                       :: Error                                        ! Flag to indicate the open failed
 
-
-
       ! See if input file Exists.
-
    INQUIRE ( FILE=TRIM( InFile ) , EXIST=Exists )
-
    IF ( .NOT. Exists )  THEN
       ErrStat = ErrID_Fatal
       ErrMsg = 'OpenUInBEFile:The input file, "'//TRIM( InFile )//'", was not found.'
       RETURN
    END IF
 
-
       ! Open the file.
-
    CALL OpenUnfInpBEFile ( Un, InFile, RecLen, Error )
 
    IF ( Error )  THEN
       ErrStat = ErrID_Fatal
       ErrMsg = 'OpenUInBEFile:Cannot open file "'//TRIM( InFile )//'".  Another program may have locked it.'
-      RETURN
    ELSE
       ErrStat = ErrID_None
       ErrMsg = ''
    END IF
 
-
    RETURN
-
    END SUBROUTINE OpenUInBEFile
 !=======================================================================
 !>  This routine opens an unformatted input file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenUInfile ( Un, InFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)         ::  Un                                           !< Logical unit for the input file
+   INTEGER, INTENT(INOUT)      ::  Un                                           !< Logical unit for the input file
    INTEGER(IntKi), INTENT(OUT) ::  ErrStat                                      !< Error status: returns "fatal" if the file doesn't exist or can't be opened
    CHARACTER(*),   INTENT(OUT) ::  ErrMsg                                       !< Error message
-
    CHARACTER(*), INTENT(IN)    ::  InFile                                       !< Name of the input file
 
-
       ! Local declarations.
-
    INTEGER                     ::  IOS                                          ! Returned input/output status.
-
    LOGICAL                      :: Exists                                       ! Flag indicating whether or not a file Exists.
 
-
+   ErrStat = ErrID_None
+   ErrMsg  = ""
 
       ! See if input file Exists.
-
    INQUIRE ( FILE=TRIM( InFile ) , EXIST=Exists )
-
    IF ( .NOT. Exists )  THEN
       ErrStat = ErrID_Fatal
       ErrMsg = 'OpenUInfile:The input file, "'//TRIM( InFile )//'", was not found.'
       RETURN
    END IF
 
-
       ! Open the file.
-
-   OPEN ( Un, FILE=TRIM( InFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='READ' )
-
-   IF ( IOS /= 0 )  THEN
-      ErrStat = ErrID_Fatal
-      ErrMsg  = 'OpenUInfile:Cannot open file "'//TRIM( InFile )//'". Another program may have locked it.'
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg  = ''
-   END IF
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN ( Un, FILE=TRIM( InFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='READ' )
+ 
+      IF ( IOS /= 0 )  THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg  = 'OpenUInfile:Cannot open file "'//TRIM( InFile )//'". Another program may have locked it.'
+      ELSE
+         ErrStat = ErrID_None
+         ErrMsg  = ''
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenUInfile
 !=======================================================================
 !>  This routine opens an unformatted output file.
+!! If the unit number provided by `Un` is <=0, a new unit number will be found.  Otherwise the unitnumber passed in will be used
    SUBROUTINE OpenUOutfile ( Un, OutFile, ErrStat, ErrMsg )
-
-      ! Argument declarations.
-
-   INTEGER, INTENT(IN)            ::  Un                                        !< Logical unit for the output file
+   INTEGER, INTENT(INOUT)         ::  Un                                        !< Logical unit for the output file
    INTEGER(IntKi), INTENT(OUT)    ::  ErrStat                                   !< Error status: returns "fatal" if the file doesn't exist or can't be opened
    CHARACTER(*),   INTENT(OUT)    ::  ErrMsg                                    !< Error message
-
    CHARACTER(*), INTENT(IN)       ::  OutFile                                   !< Name of the output file
 
-
       ! Local declarations.
-
    INTEGER                        ::  IOS                                       ! Returned input/output status.
 
-
+   ErrStat = ErrID_None
+   ErrMsg  = ""
 
       ! Open the file.
-
-   OPEN ( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='WRITE' )
-
-   IF ( IOS /= 0 )  THEN
-      ErrStat = ErrID_Fatal
-      ErrMsg  = 'OpenUOutfile:Cannot open file "'//TRIM( OutFile )//'".  Another program may have locked it for writing.'
-   ELSE
-      ErrStat = ErrID_None
-      ErrMsg  = ''
-   END IF
-
+   !$OMP critical
+   if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
+   if (ErrStat==ErrID_None) then
+      OPEN ( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='WRITE' )
+ 
+      IF ( IOS /= 0 )  THEN
+         ErrStat = ErrID_Fatal
+         ErrMsg  = 'OpenUOutfile:Cannot open file "'//TRIM( OutFile )//'".  Another program may have locked it for writing.'
+      ELSE
+         ErrStat = ErrID_None
+         ErrMsg  = ''
+      END IF
+   endif
+   !$OMP end critical
 
    RETURN
    END SUBROUTINE OpenUOutfile
@@ -4615,9 +4565,7 @@ END SUBROUTINE CheckR8Var
       RETURN
    END IF
    
-   CALL GetNewUnit ( UnIn, ErrStatLcl, ErrMsg2 )
-      CALL SetErrStat( ErrStatLcl, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
+   UnIn = -1   ! set to -1 so that Open* calls will find a valid unit number
    CALL OpenFInpFile ( UnIn, FileInfo%FileList(FileIndx), ErrStatLcl, ErrMsg2 )
       CALL SetErrStat( ErrStatLcl, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev )  RETURN
@@ -4846,7 +4794,6 @@ END SUBROUTINE CheckR8Var
    
    
       !  Open data file.
-
    CALL OpenBInpFile ( UnIn, FASTdata%File, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF (ErrStat >= AbortErrLev) THEN
@@ -4855,15 +4802,12 @@ END SUBROUTINE CheckR8Var
       END IF
       
 
-
       ! Process the requested data records of this file.
-
    CALL WrScr ( NewLine//' =======================================================' )
    CALL WrScr ( ' Reading in data from file "'//TRIM( FASTdata%File )//'".'//NewLine )
 
 
       ! Read some of the header information.
-
    READ (UnIn, IOSTAT=ErrStat2)  FileType
    IF ( ErrStat2 /= 0 )  THEN
       CALL SetErrStat ( ErrID_Fatal, 'Fatal error reading FileType from file "'//TRIM( FASTdata%File )//'".', ErrStat, ErrMsg, RoutineName )
@@ -6410,8 +6354,6 @@ END SUBROUTINE CheckR8Var
 
          ! Open the input file.
       UnIn = -1
-      CALL GetNewUnit ( UnIn, ErrStatLcl, ErrMsg2 )
-
       CALL OpenFInpFile ( UnIn, Filename, ErrStatLcl, ErrMsg2 )
       IF ( ErrStatLcl /= 0 )  THEN
          CALL SetErrStat( ErrStatLcl, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -6719,9 +6661,7 @@ END SUBROUTINE CheckR8Var
    LenDesc     = LEN_TRIM( DescStr )    ! Length of the string that contains program name, version, date, and time
 
       ! Generate the unit number for the binary file
-   UnIn = 0
-   CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   UnIn = -1
 
    !...............................................................................................................................
    ! Open the binary file for output
