@@ -734,15 +734,15 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
 
       ! Initialize the echo file unit to -1 which is the default to prevent echoing, we will alter this based on user input
    UnEchoLocal = -1
+   UnIn        = -1  ! set to -1 so that Open* calls will find a valid unit number
 
    FileName = TRIM(DvrFileName)
 
-   CALL GetNewUnit( UnIn )
    CALL OpenFInpFile( UnIn, FileName, ErrStatTmp, ErrMsgTmp )
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,' Failed to open InflowWind Driver input file: '//FileName,   &
          ErrStat,ErrMsg,RoutineName)
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -758,7 +758,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    CALL ReadCom( UnIn, FileName,' InflowWind Driver input file header line 1', ErrStatTmp, ErrMsgTmp )
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -766,7 +766,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    CALL ReadCom( UnIn, FileName, 'InflowWind Driver input file header line 2', ErrStatTmp, ErrMsgTmp )
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -775,7 +775,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    CALL ReadVar ( UnIn, FileName, EchoFileContents, 'Echo', 'Echo Input', ErrStatTmp, ErrMsgTmp )
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -787,11 +787,10 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( EchoFileContents ) THEN
 
       EchoFileName = TRIM(FileName)//'.ech'
-      CALL GetNewUnit( UnEchoLocal )
       CALL OpenEcho ( UnEchoLocal, EchoFileName, ErrStatTmp, ErrMsgTmp, ProgInfo )
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -804,7 +803,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal, ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -813,7 +812,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -823,7 +822,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -841,7 +840,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -852,7 +851,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ELSE
       DvrFlags%IfWIptFile  =  .TRUE.
@@ -886,7 +885,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       
    IF ( ErrStat >= AbortErrLev ) THEN
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -904,7 +903,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -933,7 +932,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ELSE
       DvrFlags%TStart   =  .TRUE.
@@ -946,7 +945,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -975,7 +974,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
 !   ELSE
 !      DvrFlags%Summary  =  .TRUE.
@@ -988,7 +987,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
 !   ELSE
 !      DvrFlags%SummaryFile =  .TRUE.
@@ -1000,7 +999,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1014,7 +1013,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1025,7 +1024,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1038,7 +1037,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStat /= ErrID_None ) THEN
          CALL SetErrStat( ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
    ELSE
@@ -1046,7 +1045,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
         RETURN
       ENDIF
    ENDIF
@@ -1062,7 +1061,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1074,7 +1073,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1085,7 +1084,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1097,7 +1096,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1110,7 +1109,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1121,7 +1120,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
    IF ( ErrStatTmp /= ErrID_None ) THEN
       CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
       CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-      CLOSE( UnIn )
+      CLOSE( UnIn );  UnIn = -1
       RETURN
    ENDIF
 
@@ -1135,7 +1134,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStat /= ErrID_None ) THEN
          CALL SetErrStat( ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -1145,7 +1144,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStat /= ErrID_None ) THEN
          CALL SetErrStat( ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -1164,7 +1163,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStat /= ErrID_None ) THEN
          CALL SetErrStat( ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
 
@@ -1288,21 +1287,21 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
       CALL ReadCom( UnIn, FileName,' Skipping the gridded data section since not calculating it.', ErrStatTmp, ErrMsgTmp, UnEchoLocal )
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
       CALL ReadCom( UnIn, FileName,' Skipping the gridded data section since not calculating it.', ErrStatTmp, ErrMsgTmp, UnEchoLocal )
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
          CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-         CLOSE( UnIn )
+         CLOSE( UnIn );  UnIn = -1
          RETURN
       ENDIF
    ENDIF
@@ -1311,7 +1310,7 @@ SUBROUTINE ReadDvrIptFile( DvrFileName, DvrFlags, DvrSettings, ProgInfo, ErrStat
 
       ! Close the echo and input file
    CALL CleanupEchoFile( EchoFileContents, UnEchoLocal )
-   CLOSE( UnIn )
+   CLOSE( UnIn );  UnIn = -1
 
 
 CONTAINS
@@ -1820,14 +1819,14 @@ SUBROUTINE ReadPointsFile( PointsFileName, CoordList, ErrStat, ErrMsg )
    ErrMsgTmp   =  ''
    ErrStat     =  ErrID_None
    ErrStatTmp  =  ErrID_None
+   FiUnitPoints = -1 ! set to -1 so that Open* calls will find a valid unit number
 
 
       ! Now open file
-   CALL GetNewUnit(    FiUnitPoints )
    CALL OpenFInpFile(   FiUnitPoints,  TRIM(PointsFileName), ErrStatTmp, ErrMsgTmp )   ! Unformatted input file
    IF ( ErrStatTmp >= AbortErrLev ) THEN
       CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, 'ReadPointsFile')
-      CLOSE( FiUnitPoints )
+      CLOSE( FiUnitPoints );  FiUnitPoints = -1
       RETURN
    ENDIF
 
@@ -1835,14 +1834,14 @@ SUBROUTINE ReadPointsFile( PointsFileName, CoordList, ErrStat, ErrMsg )
    CALL GetFileLength( FiUnitPoints, PointsFileName, NumDataColumns, NumDataPoints, NumHeaderLines, ErrMsgTmp, ErrStatTmp )
    IF ( ErrStatTmp >= AbortErrLev ) THEN
       CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, 'ReadPointsFile')
-      CLOSE( FiUnitPoints )
+      CLOSE( FiUnitPoints );  FiUnitPoints = -1
       RETURN
    ENDIF
    IF ( NumDataColumns /= 3 ) THEN
       CALL SetErrStat( ErrID_Fatal,' Expecting three columns in '//TRIM(PointsFileName)//' corresponding to '//   &
          'X, Y, and Z coordinates.  Instead found '//TRIM(Num2LStr(NumDataColumns))//'.', &
          ErrStat, ErrMsg, 'ReadPointsFile')
-      CLOSE( FiUnitPoints )
+      CLOSE( FiUnitPoints );  FiUnitPoints = -1
       RETURN
    ENDIF
 
@@ -1851,7 +1850,7 @@ SUBROUTINE ReadPointsFile( PointsFileName, CoordList, ErrStat, ErrMsg )
    CALL AllocAry( CoordList, 3, NumDataPoints, "Array of Points data", ErrStatTmp, ErrMsgTmp )
    IF ( ErrStatTmp >= AbortErrLev ) THEN
       CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, 'ReadPointsFile')
-      CLOSE( FiUnitPoints )
+      CLOSE( FiUnitPoints );  FiUnitPoints = -1
       RETURN
    ENDIF
 
@@ -1861,7 +1860,7 @@ SUBROUTINE ReadPointsFile( PointsFileName, CoordList, ErrStat, ErrMsg )
       CALL ReadCom( FiUnitPoints, PointsFileName,' Points file header line', ErrStatTmp, ErrMsgTmp )
       IF ( ErrStatTmp /= ErrID_None ) THEN
          CALL SetErrStat(ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,'ReadPointsFile')
-         CLOSE( FiUnitPoints )
+         CLOSE( FiUnitPoints );  FiUnitPoints = -1
          RETURN
       ENDIF
    ENDDO
@@ -1872,12 +1871,12 @@ SUBROUTINE ReadPointsFile( PointsFileName, CoordList, ErrStat, ErrMsg )
          'Coordinate point from Points file', ErrStatTmp, ErrMsgTmp)
       IF ( ErrStat /= ErrID_None ) THEN
          CALL SetErrStat( ErrID_Fatal,ErrMsgTmp,ErrStat,ErrMsg,'ReadPointsFile')
-         CLOSE( FiUnitPoints )
+         CLOSE( FiUnitPoints );  FiUnitPoints = -1
          RETURN
       ENDIF
    ENDDO
 
-   CLOSE( FiUnitPoints )
+   CLOSE( FiUnitPoints );  FiUnitPoints = -1
 
 CONTAINS
 
@@ -2318,8 +2317,7 @@ SUBROUTINE WindGridVel_OutputWrite (OutFile, Settings, GridXYZ, GridVel, TIME, E
 
       ! If it hasn't been initially written to, do this then exit. Otherwise set a few things and continue.
    IF ( .NOT. OutFile%Initialized ) THEN
-
-      CALL GetNewUnit( OutFile%Unit )
+      OutFile%Unit = -1    ! set to -1 so that Open* calls will find a valid unit number
       CALL OpenFOutFile( OutFile%Unit, TRIM(OutFile%Name), ErrStatTmp, ErrMsgTmp )
       CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, 'WindGridVel_OutputWrite' )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -2388,8 +2386,7 @@ SUBROUTINE PointData_OutputWrite (OutFile, Settings, GridXYZ, GridVel, GridAcc, 
 
       ! If it hasn't been initially written to, do this then exit. Otherwise set a few things and continue.
    IF ( .NOT. OutFile%Initialized ) THEN
-
-      CALL GetNewUnit( OutFile%Unit )
+      OutFile%Unit = -1    ! set to -1 so that Open* calls will find a valid unit number
       CALL OpenFOutFile( OutFile%Unit, TRIM(OutFile%Name), ErrStatTmp, ErrMsgTmp )
       CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, 'PointData_OutputWrite' )
       IF ( ErrStat >= AbortErrLev ) RETURN
@@ -2445,24 +2442,18 @@ subroutine IfW_WriteUniform(FF, FileRootName, ErrStat, ErrMsg)
 
    character(*), parameter          :: RoutineName = "IfW_WriteUniform"
    type(UniformFieldType)           :: UF
-   integer(IntKi)                   :: unit
    integer(IntKi)                   :: ErrStat2
    character(ErrMsgLen)             :: ErrMsg2
 
    ErrStat = ErrID_None
    ErrMsg = ""
 
-   ! Get new unit for writing file
-   call GetNewUnit(unit, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
-
    ! Switch based on field type
    select case (FF%FieldType)
 
    case (Uniform_FieldType)
 
-      call Uniform_WriteHH(FF%Uniform, FileRootName, unit, ErrStat2, ErrMsg2)
+      call Uniform_WriteHH(FF%Uniform, FileRootName, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    case (Grid3D_FieldType)
@@ -2470,7 +2461,7 @@ subroutine IfW_WriteUniform(FF, FileRootName, ErrStat, ErrMsg)
       call Grid3D_to_Uniform(FF%Grid3D, UF, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if (ErrStat < AbortErrLev) then
-         call Uniform_WriteHH(UF, FileRootName, unit, ErrStat2, ErrMsg2)
+         call Uniform_WriteHH(UF, FileRootName, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       end if
 
@@ -2492,14 +2483,8 @@ subroutine IfW_WriteHAWC(FF, FileRootName, ErrStat, ErrMsg)
 
    character(*), parameter          :: RoutineName = "IfW_Convert2HAWC"
    type(Grid3DFieldType)            :: G3D
-   integer(IntKi)                   :: unit
    integer(IntKi)                   :: ErrStat2
    character(ErrMsgLen)             :: ErrMsg2
-
-   ! Get new unit for writing file
-   call GetNewUnit(unit, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
 
    ! Switch based on field type
    select case (FF%FieldType)
@@ -2509,13 +2494,13 @@ subroutine IfW_WriteHAWC(FF, FileRootName, ErrStat, ErrMsg)
       call Uniform_to_Grid3D(FF%Uniform, FF%VelInterpCubic, G3D, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if (ErrStat < AbortErrLev) then
-         call Grid3D_WriteHAWC(G3D, FileRootName, unit, ErrStat2, ErrMsg2)
+         call Grid3D_WriteHAWC(G3D, FileRootName, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       end if
 
    case (Grid3D_FieldType)
 
-      call Grid3D_WriteHAWC(FF%Grid3D, FileRootName, unit, ErrStat, ErrMsg)
+      call Grid3D_WriteHAWC(FF%Grid3D, FileRootName, ErrStat, ErrMsg)
 
    case default
 
@@ -2543,11 +2528,6 @@ subroutine IfW_WriteBladed(FF, FileRootName, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg = ""
 
-   ! Get new unit for writing file
-   call GetNewUnit(unit, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
-
    ! Switch based on field type
    select case (FF%FieldType)
 
@@ -2556,13 +2536,13 @@ subroutine IfW_WriteBladed(FF, FileRootName, ErrStat, ErrMsg)
       call Uniform_to_Grid3D(FF%Uniform, FF%VelInterpCubic, G3D, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if (ErrStat < AbortErrLev) then
-         call Grid3D_WriteBladed(G3D, FileRootName, unit, ErrStat2, ErrMsg2)
+         call Grid3D_WriteBladed(G3D, FileRootName, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       end if
 
    case (Grid3D_FieldType)
 
-      call Grid3D_WriteBladed(FF%Grid3D, FileRootName, unit, ErrStat, ErrMsg)
+      call Grid3D_WriteBladed(FF%Grid3D, FileRootName, ErrStat, ErrMsg)
 
    case default
 
@@ -2584,17 +2564,11 @@ subroutine IfW_WriteVTK(FF, FileRootName, ErrStat, ErrMsg)
 
    character(*), parameter          :: RoutineName = "IfW_WriteVTK"
    type(Grid3DFieldType)            :: G3D
-   integer(IntKi)                   :: unit
    integer(IntKi)                   :: ErrStat2
    character(ErrMsgLen)             :: ErrMsg2
 
    ErrStat = ErrID_None
    ErrMsg = ""
-
-   ! Get new unit for writing file
-   call GetNewUnit(unit, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
 
    ! Switch based on field type
    select case (FF%FieldType)
@@ -2604,13 +2578,13 @@ subroutine IfW_WriteVTK(FF, FileRootName, ErrStat, ErrMsg)
       call Uniform_to_Grid3D(FF%Uniform, FF%VelInterpCubic, G3D, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if (ErrStat < AbortErrLev) then
-         call Grid3D_WriteVTK(G3D, FileRootName, unit, ErrStat2, ErrMsg2)
+         call Grid3D_WriteVTK(G3D, FileRootName, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       end if
 
    case (Grid3D_FieldType)
 
-      call Grid3D_WriteVTK(FF%Grid3D, FileRootName, unit, ErrStat, ErrMsg)
+      call Grid3D_WriteVTK(FF%Grid3D, FileRootName, ErrStat, ErrMsg)
 
    case default
 
