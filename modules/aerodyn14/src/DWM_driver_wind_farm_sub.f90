@@ -27,7 +27,7 @@ SUBROUTINE read_wind_farm_parameter(PriFile)
     IMPLICIT NONE
 
     CHARACTER(*), INTENT(IN) :: PriFile
-    INTEGER  ::  UnIn = 0
+    INTEGER  ::  UnIn = -1    ! set to -1 so that Open* calls will find a valid unit number
     INTEGER  ::  UnEc = -1
     INTEGER  ::  I
     CHARACTER(1024) :: DWM_Title,comment
@@ -176,13 +176,12 @@ SUBROUTINE write_parameter_to_file()
     IMPLICIT NONE
     integer   :: Un
     
-    !CALL GetNewUnit(Un)
-    Un = 10
-    
+    CALL GetNewUnit(Un)
     OPEN(unit = Un, status='replace',file='DWM_parameter.bin',form='unformatted')
     WRITE(Un)   HubHt,RotorR,NumWT,Uambient,TI,Domain_R,Domain_X,ppR,Mstl,Mmt,WFLowerBd,Winddir,Tinfluencer
     CLOSE(Un)
     
+    CALL GetNewUnit(Un)
     OPEN(unit = Un, status='replace',file='wind_farm_coordinate.bin',form='unformatted')
     WRITE(Un)   Xcoordinate,Ycoordinate
     CLOSE(Un)
@@ -279,11 +278,10 @@ SUBROUTINE wind_farm_geometry()
         END DO
     END DO
     
-    !CALL GetNewUnit(Un)    
-    Un = 10
+    CALL GetNewUnit(Un)    
     OPEN(unit = Un, status='replace',file='wind_farm_turbine_sort.bin',form='unformatted')    
     WRITE(Un)   turbine_sort(:)                                                                                                                                                                                                    
-    CLOSE(Un)
+    CLOSE(Un);  Un = -1
     
          !'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
          ! calculate the angles between the line connecting two turbines and the wind direction
@@ -313,15 +311,15 @@ SUBROUTINE wind_farm_geometry()
         END DO
     END DO
     
-    !CALL GetNewUnit(Un)    
-    Un = 10
+    CALL GetNewUnit(Un)    
     OPEN(unit = Un, status='replace',file='turbine_angles.bin',form='unformatted')    
     WRITE(Un)   turbine_angle(:,:)                                                                                                                                                                                                    
-    CLOSE(Un)
+    CLOSE(Un); Un = -1
     
+    CALL GetNewUnit(Un)    
     OPEN(unit = Un, status='replace',file='turbine_distance.bin',form='unformatted')    
     WRITE(Un)   length(:)                                                                                                                                                                                                    
-    CLOSE(Un)
+    CLOSE(Un); Un = -1
     
     ! check if the Domain_X is larger than the maximum spacing
     Max_spacing = 0.0
@@ -343,9 +341,10 @@ SUBROUTINE wind_farm_geometry()
     
     ! test
     
-    OPEN (unit=25,file="turbine_spacing.txt")
-    WRITE (25,*) length(:)
-    CLOSE(25)
+    CALL GetNewUnit(Un)    
+    OPEN (unit=Un,file="turbine_spacing.txt")
+    WRITE (Un,*) length(:)
+    CLOSE(Un); Un = -1
     
 END SUBROUTINE wind_farm_geometry
 
@@ -372,6 +371,7 @@ SUBROUTINE cal_wake_sector_angle()
     INTEGER     ::     Turbine0_index
     INTEGER     ::     Turbine1_index
     INTEGER     ::     Counter
+    INTEGER     ::     Un
     REAL        ::     Turbine_Spacing
     REAL        ::     vector1x
     REAL        ::     vector1y
@@ -395,13 +395,15 @@ SUBROUTINE cal_wake_sector_angle()
     Pi = ACOS( -1.0 )
     
     ! read the wake file and wake width
-    OPEN(unit = 10, status='old',file='Wake_width_Turbine_0.bin',form='unformatted')  ! open an existing file
-    READ(10)  wake_width(:)
-    CLOSE(10)
+    CALL GetNewUnit(Un)    
+    OPEN(unit = Un, status='old',file='Wake_width_Turbine_0.bin',form='unformatted')  ! open an existing file
+    READ(Un)  wake_width(:)
+    CLOSE(Un)
     
-    OPEN(unit = 10, status='old',file='WC_Turbine_0.bin',form='unformatted')  ! open an existing file
-    READ(10)  wake_center_position(:,:,:)
-    CLOSE(10)
+    CALL GetNewUnit(Un)    
+    OPEN(unit = Un, status='old',file='WC_Turbine_0.bin',form='unformatted')  ! open an existing file
+    READ(Un)  wake_center_position(:,:,:)
+    CLOSE(Un)
     
          !'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
          ! calculate the wake sector angle array
@@ -419,9 +421,10 @@ SUBROUTINE cal_wake_sector_angle()
        wake_sector_angle_array(I) = Sector_angle(wake_width,wake_center_position,distance_array(I))
     END DO
     
-    OPEN(unit = 10, status='replace',file='wake_sector_angle.bin',form='unformatted')    
-    WRITE(10)   wake_sector_angle_array(:)                                                                                                                                                                                                    
-    CLOSE(10)
+    CALL GetNewUnit(Un)    
+    OPEN(unit = Un, status='replace',file='wake_sector_angle.bin',form='unformatted')    
+    WRITE(Un)   wake_sector_angle_array(:)                                                                                                                                                                                                    
+    CLOSE(Un)
 
          !'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
          ! for a specfic downstream turbine, determine the wakes from which upstream turbines will make an effect 
@@ -468,9 +471,10 @@ SUBROUTINE cal_wake_sector_angle()
         END DO
     END DO
     
-    OPEN(unit = 10, status='replace',file='turbine_interaction.bin',form='unformatted')    
-    WRITE(10)   TurbineInfluenceData(:,:)                                                                                                                                                                                                    
-    CLOSE(10)
+    CALL GetNewUnit(Un)    
+    OPEN(unit = Un, status='replace',file='turbine_interaction.bin',form='unformatted')    
+    WRITE(Un)   TurbineInfluenceData(:,:)                                                                                                                                                                                                    
+    CLOSE(Un)
 
 END SUBROUTINE cal_wake_sector_angle
 
@@ -712,7 +716,7 @@ SUBROUTINE delete_temp_files()
     CHARACTER(LEN=22) :: Prefix             = 'DWM-results/'
     CHARACTER(LEN=4)  :: connectionprefix   = '_to_'
     CHARACTER(LEN=8)  :: Turbineprefix      = 'Turbine_'
-    INTEGER           :: I,J,K
+    INTEGER           :: I,J,K,Un
     INTEGER           :: downwindturbine_number
     INTEGER,ALLOCATABLE :: downwind_turbine_index(:)
     
@@ -728,12 +732,14 @@ SUBROUTINE delete_temp_files()
         END IF
     
         filename_meanU_bin = trim(Prefix)//trim(MeanUprefix_bin)//trim(Turbineprefix)//trim(invetigated_turbine_index_character)//".bin"    
-        OPEN (29, file=filename_meanU_bin)
-        CLOSE (29, status='delete')
+        CALL GetNewUnit(Un)    
+        OPEN (Un, file=filename_meanU_bin)
+        CLOSE (Un, status='delete')
         
         filename_wakecenter_bin = trim(Prefix)//trim(WCprefix_bin)//trim(Turbineprefix)//trim(invetigated_turbine_index_character)//".bin"
-        OPEN (29, file=filename_wakecenter_bin)
-        CLOSE (29, status='delete')
+        CALL GetNewUnit(Un)    
+        OPEN (Un, file=filename_wakecenter_bin)
+        CLOSE (Un, status='delete')
     END DO  
     
     
@@ -779,39 +785,49 @@ SUBROUTINE delete_temp_files()
                 filename_smoothWake_bin = trim(Prefix)//trim(SmoothWprefix_bin)//trim(Turbineprefix)//trim(invetigated_turbine_index_character)&
                                           //trim(connectionprefix)//trim(downwind_turbine_index_character)//".bin"
     
-                OPEN  (29, file=filename_u_bin)
-                CLOSE (29, status='delete')
+                CALL GetNewUnit(Un)    
+                OPEN  (Un, file=filename_u_bin)
+                CLOSE (Un, status='delete')
                 
-                OPEN  (29, file=filename_TI_bin)
-                CLOSE (29, status='delete')
+                CALL GetNewUnit(Un)    
+                OPEN  (Un, file=filename_TI_bin)
+                CLOSE (Un, status='delete')
                 
-                OPEN  (29, file=filename_smoothWake_bin)
-                CLOSE (29, status='delete')
+                CALL GetNewUnit(Un)    
+                OPEN  (Un, file=filename_smoothWake_bin)
+                CLOSE (Un, status='delete')
             END DO
         END IF
     END DO
     
     
-    OPEN (29, file='turbine_angles.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='turbine_angles.bin')
+    CLOSE (Un, status='delete')
 
-    OPEN (29, file='turbine_distance.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='turbine_distance.bin')
+    CLOSE (Un, status='delete')
     
-    OPEN (29, file='turbine_interaction.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='turbine_interaction.bin')
+    CLOSE (Un, status='delete')
     
-    OPEN (29, file='wake_sector_angle.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='wake_sector_angle.bin')
+    CLOSE (Un, status='delete')
     
-    OPEN (29, file='Wake_width_Turbine_0.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='Wake_width_Turbine_0.bin')
+    CLOSE (Un, status='delete')
     
-    OPEN (29, file='WC_Turbine_0.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='WC_Turbine_0.bin')
+    CLOSE (Un, status='delete')
     
-    OPEN (29, file='wind_farm_turbine_sort.bin')
-    CLOSE (29, status='delete')
+    CALL GetNewUnit(Un)    
+    OPEN (Un, file='wind_farm_turbine_sort.bin')
+    CLOSE (Un, status='delete')
     
     
 END SUBROUTINE delete_temp_files

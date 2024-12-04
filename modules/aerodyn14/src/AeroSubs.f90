@@ -58,18 +58,15 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
    
    ErrStat = ErrID_None
    ErrMess = ''
+   UnIn    = -1   ! set to -1 so that Open* calls will find a valid unit number
    
-      ! Function definition
-
-   call GetNewUnit(UnIn, ErrStatLcl, ErrMessLcl)
-
    !-------------------------------------------------------------------------------------------------
    ! Open the AeroDyn input file
    !-------------------------------------------------------------------------------------------------
    CALL OpenFInpFile(UnIn, TRIM(InitInp%ADFileName), ErrStatLcl, ErrMessLcl)
    CALL SetErrStat(ErrStatLcl, ErrMessLcl,ErrStat, ErrMess,RoutineName)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
@@ -93,7 +90,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
    CALL ReadStr( UnIn, InitInp%ADFileName, InitInp%Title, VarName='Title', VarDescr='File title', ErrStat=ErrStatLcl, ErrMsg=ErrMessLcl)
    CALL SetErrStat(ErrStatLcl, ErrMessLcl,ErrStat, ErrMess,RoutineName)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
@@ -107,7 +104,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the stall model
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='DStall', VarDescr='Stall model', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
@@ -121,7 +118,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       CASE DEFAULT
          CALL ProgWarn( ' Error: Expecting "STEADY" or "BEDDOES" stall model option.')
          ErrStat = ErrID_Fatal
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
    END SELECT
 
@@ -129,7 +126,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the CM option
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='PMoment', VarDescr='Pitching moment option', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
@@ -143,7 +140,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       CASE DEFAULT
          CALL ProgWarn( ' Error: Expecting "USE_CM" or "NO_CM" pitching moment option.')
          ErrStat = ErrID_Fatal
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
    END SELECT
 
@@ -151,7 +148,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the inflow model option
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='DynInfl', VarDescr='Inflow model', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
    
@@ -186,7 +183,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       CASE DEFAULT
          CALL ProgWarn( ' Error: Expecting "EQUIL" or "DYNIN" inflow model option.')
          ErrStat = ErrID_Fatal
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
    END SELECT
 
@@ -194,7 +191,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the wake model
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='Wake', VarDescr='Wake model', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
    CALL Conv2UC(LINE(1:5))
@@ -215,21 +212,21 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       CASE DEFAULT
          CALL ProgWarn( ' Error: Expecting "NONE", "WAKE", or "SWIRL" wake model option.')
          ErrStat = ErrID_Fatal
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
    END SELECT
 
       ! Read in the tolerance for the wake model
    CALL ReadVar( UnIn, InitInp%ADFileName, P%Inducedvel%AToler, VarName='AToler', VarDescr='Induction factor tolerance', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
        ! Read in the tip-loss model for EQUIL inflow
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='TLoss', VarDescr='Tip-loss model', ErrStat=ErrStat, ErrMsg=ErrMess)
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
    
@@ -252,7 +249,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          CASE DEFAULT
             CALL ProgWarn( ' Error: Expecting "NONE", "PRAND", or "GTECH" tip-loss model option.')
             ErrStat = ErrID_Fatal
-            CLOSE(UnIn)
+            CLOSE(UnIn);  UnIn = -1
             RETURN
       END SELECT
    END IF
@@ -275,7 +272,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          CASE DEFAULT
             CALL ProgWarn( ' Error: Expecting "NONE" or "PRAND" hub-loss model option.')
             ErrStat = ErrID_Fatal
-            CLOSE(UnIn)
+            CLOSE(UnIn);  UnIn = -1
             RETURN
       END SELECT
    END IF
@@ -286,7 +283,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
 !   CALL ReadStr( UnIn, InitInp%ADFileName, LINE, VarName='NewTowerModel?', VarDescr='Check for tower influence model', ErrStat=ErrStat )
    CALL ReadVar( UnIn, InitInp%ADFileName, LINE, VarName='NewTowerModel?', VarDescr='Check for tower influence model', ErrStat=ErrStat, ErrMsg=ErrMess )
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(UnIn)
+      CLOSE(UnIn);  UnIn = -1
       RETURN
    END IF
 
@@ -302,21 +299,21 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          ! Read in the tower potential flow switch
       CALL ReadVar( UnIn, InitInp%ADFileName, P%TwrProps%TwrPotent, VarName='TwrPotent', VarDescr='Tower influence model', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
          ! Read in the tower shadow switch
       CALL ReadVar( UnIn, InitInp%ADFileName, P%TwrProps%TwrShadow, VarName='TwrShadow', VarDescr='Tower shadow model', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
          ! Read in the tower drag file name
       CALL ReadVar( UnIn, InitInp%ADFileName, P%TwrProps%TwrFile, VarName='TwrFile', VarDescr='Tower data file name', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -325,7 +322,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          ! Read in the flag to tell AeroDyn to compute tower aerodynamics.
       CALL ReadVar( UnIn, InitInp%ADFileName, P%TwrProps%CalcTwrAero, VarName='CalcTwrAero', VarDescr='Flag to calculate tower aerodynamics', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -342,7 +339,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          ! Read in the tower shadow deficit
       IF ( INDEX( 'FTft', Line(:1) ) > 0 )  THEN
          CALL ProgWarn( ' Invalid numeric input. "'//TRIM( Line )//'" found when trying to read TwrShad.' )
-         close(unin)
+         close(unin);  UnIn = -1
          ErrStat = ErrID_Fatal
          RETURN
       ELSE
@@ -375,7 +372,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          ! Read in the tower shadow reference point (distance from yaw axis to hub)
       CALL ReadVar( UnIn, InitInp%ADFileName, P%TwrProps%T_Shad_Refpt, VarName='T_Shad_Refpt', VarDescr='Tower shadow reference point', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -388,7 +385,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the air density
    CALL ReadVar( UnIn, InitInp%ADFileName, P%Wind%Rho, VarName='Rho', VarDescr='Air density', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -402,14 +399,14 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the kinematic viscosity
    CALL ReadVar( UnIn, InitInp%ADFileName, P%Wind%KinVisc, 'KinVisc', 'Kinematic viscosity', ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
       ! Aero calculation time interval
    CALL ReadVar( UnIn, InitInp%ADFileName, Line, 'DtAero', 'Aero calculation time step', ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
       CALL Conv2UC( Line )
@@ -427,14 +424,14 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read the number of airfoil files
    CALL ReadVar( UnIn, InitInp%ADFileName, P%AirFoil%NumFoil, 'NumFoil', 'Number of airfoil files', ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
    IF ( P%AirFoil%NumFoil < 1 ) THEN
       CALL ProgWarn( ' Error: Number of airfoil files must be a positive integer.')
       ErrStat = ErrID_Fatal
-      close(unin)
+      close(unin);  UnIn = -1
       RETURN
    END IF
 
@@ -445,14 +442,14 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ALLOCATE ( P%AirFoil%FoilNm( P%AirFoil%NumFoil ) , STAT=ErrStat )
       IF ( ErrStat /= ErrID_None ) THEN
          CALL ProgWarn(' Error allocating space for the FoilNm array.')
-         close(unin)
+         close(unin);  UnIn = -1
          RETURN
       END IF
    END IF
 
    CALL ReadAryLines( UnIn, InitInp%ADFileName, P%AirFoil%FoilNm, P%AirFoil%NumFoil, AryName='FoilNm', AryDescr='Airfoil file names', ErrStat=ErrStat, ErrMsg=ErrMess )
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -464,7 +461,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
       ! Read in the number of blade elements
    CALL ReadVar( UnIn, InitInp%ADFileName, P%Element%NElm, VarName='NElm', VarDescr='Number of blade elements', ErrStat=ErrStat, ErrMsg=ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -480,7 +477,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
 
    CALL ReadCom( UnIn, InitInp%ADFileName, 'Element table headers', ErrStat, ErrMess)
       IF (ErrStat >= AbortErrLev) THEN
-         CLOSE(UnIn)
+         CLOSE(UnIn);  UnIn = -1
          RETURN
       END IF
 
@@ -532,12 +529,12 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
 
          CALL ProgWarn( ' Premature end of file while reading line '//TRIM(Int2Lstr(IElm))// &
                      ' of the AeroDyn element table in file "'//TRIM(InitInp%ADFileName)//'."' )
-         close(unin)
+         close(unin);  UnIn = -1
          ErrStat = ErrID_Fatal
          ErrMess = 'Error reading from line '//TRIM(Int2Lstr(IElm))//' of the AeroDyn element table.'
          RETURN
       ELSE
-         close(unin)
+         close(unin);  UnIn = -1
          ErrStat = ErrID_Fatal
          ErrMess = 'Error reading from line '//TRIM(Int2Lstr(IElm))// &
                        ' of the AeroDyn element table in file "'//TRIM(InitInp%ADFileName)//'."'
@@ -551,7 +548,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          CALL ProgWarn(' Error reading from line '//TRIM(Int2Lstr(IElm))//' of the AeroDyn element table.'// &
                        ' Chord length must be larger than 0.' )
          ErrStat = ErrID_Fatal
-         close(unin)
+         close(unin);  UnIn = -1
          RETURN
       ENDIF
 
@@ -559,7 +556,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          CALL ProgWarn(' Error reading from line '//TRIM(Int2Lstr(IElm))//' of the AeroDyn element table.'// &
                        ' Airfoil file ID must be a number between 1 and '//TRIM(Int2Lstr(p%AirFoil%NumFoil))//'.' )
          ErrStat = ErrID_Fatal
-         close(unin)
+         close(unin);  UnIn = -1
          RETURN
       END IF
 
@@ -580,7 +577,7 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
          CALL WrScr1 ( ' Invalid character input for file "'//TRIM( InitInp%ADFileName )//'".' )
          CALL ProgWarn ( ' The error occurred while trying to read "MultiTab".' )
          ErrStat=ErrID_Fatal
-         close(unin)      
+         close(unin);  UnIn = -1
          RETURN
       ELSE IF (ErrStatLcl == 0) THEN
          IF ( p%Echo )  THEN
@@ -597,17 +594,14 @@ SUBROUTINE AD14_GetInput(InitInp, P, x, xd, z, m, y, ErrStat, ErrMess )
    !-------------------------------------------------------------------------------------------------
    ! Close AeroDyn input file
    !-------------------------------------------------------------------------------------------------
-   CLOSE(UnIn)
+   CLOSE(UnIn);  UnIn = -1
 
    !-------------------------------------------------------------------------------------------------
    ! Read airfoil data and check for MultiTab values using LINE, which was read above
    !-------------------------------------------------------------------------------------------------
    CALL READFL(InitInp, P, x, xd, z, m, y, ErrStatLcl, ErrMessLcl)     
    CALL SetErrStat(ErrStatLcl, ErrMessLcl, ErrStat, ErrMess,'AD_GetInput')   
-   IF ( ErrStat >= AbortErrLev ) THEN
-      close(unin)
-      RETURN
-   END IF
+   IF ( ErrStat >= AbortErrLev ) RETURN
       
    m%AirFoil%MulTabLoc = 0.0                                    ! Initialize this value
 
@@ -746,14 +740,12 @@ END SUBROUTINE AD14_GetInput
 
    ErrStat = ErrID_None
    ErrMess = ""
+   UnOut   = -1   ! set to -1 so that Open* calls will find a valid unit number
 
-   ! Function definition
-
-   CALL GetNewUnit( UnOut, ErrStat, ErrMess )
    CALL OpenFOutFile( UnOut, FileName, ErrStatLcl, ErrMessLcl)
       CALL SetErrStat(ErrStatLcl,ErrMessLcl,ErrStat,ErrMess,'ADOut' )
       IF ( ErrStat >= AbortErrLev )  THEN
-         CLOSE(UnOut)
+         CLOSE(UnOut);  UnOut = -1
          RETURN
       END IF
 
@@ -1026,17 +1018,17 @@ CHARACTER(1024)              :: LINE
    ErrStat = ErrID_None
    ErrMess = ""
 
-   CALL GetNewUnit(NUNIT, ErrStat, ErrMess) 
    p%AirFoil%NumCL    = 0
 
  ! The first loop checks existence and file length to set NumCL
 DO NFOILID = 1, p%AirFoil%NUMFOIL
 
  ! Open the file for reading # of lines
+   NUNIT   = -1   ! set to -1 so that Open* calls will find a valid unit number
    CALL OpenFInpFile (NUNIT, TRIM(p%AirFoil%FOILNM(NFOILID)), ErrStatLcL, ErrMessLcl)
    CALL SetErrStat( ErrStatLcL, ErrMessLcl, ErrStat, ErrMess, 'READFL')
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(NUNIT)
+      CLOSE(NUNIT);  NUNIT = -1
       RETURN
    END IF
 
@@ -1051,7 +1043,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
 
    p%AirFoil%NumCL = MAX(NumLines - 14, p%AirFoil%NumCL)
 
-   CLOSE (NUNIT)
+   CLOSE (NUNIT);  NUNIT = -1
 
 END DO ! NFOILID
 
@@ -1065,10 +1057,11 @@ CALL AllocArrays (InitInp, P, x, xd, z, m, y, 'Aerodata')
 DO NFOILID = 1, p%AirFoil%NUMFOIL
 
  ! Open the file for reading inputs
+   NUNIT   = -1   ! set to -1 so that Open* calls will find a valid unit number
    CALL OpenFInpFile (NUNIT, TRIM(Adjustl(p%AirFoil%FOILNM(NFOILID))), ErrStatLcL, ErrMessLcl )
    CALL SetErrStat( ErrStatLcL, ErrMessLcl, ErrStat, ErrMess, 'READFL')
    IF (ErrStat >= AbortErrLev) THEN
-      CLOSE(NUNIT)
+      CLOSE(NUNIT);  NUNIT = -1
       RETURN
    END IF
    
@@ -1082,8 +1075,9 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , '# of tables', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
+      return
    END IF
    
 
@@ -1096,7 +1090,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CLPosPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CLPosPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1106,7 +1100,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CDPosPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CDPosPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1115,7 +1109,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CMPosPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CMPosPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1124,7 +1118,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CLNegPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CLNegPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1133,7 +1127,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CDNegPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CDNegPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1142,7 +1136,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
       ALLOCATE ( CMNegPI(P%AirFoil%NTables(NFOILID)) , STAT=Sttus )
       IF ( Sttus /= 0 ) THEN
          CALL SetErrStat( ErrID_Fatal, ' Error allocating memory for CMNegPI array.', ErrStat, ErrMess, 'READFL' )
-         close(NUNIT)
+         close(NUNIT);  NUNIT = -1
          RETURN
       END IF
    END IF
@@ -1153,7 +1147,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) then
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'multi-table metric', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1165,28 +1159,28 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) then
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , '5th line', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) then
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , '6th line', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) then
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , '7th line', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) then
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , '8th line', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1196,7 +1190,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'Angle of zero lift (AOL)', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1205,7 +1199,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'CNA', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1214,7 +1208,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'CNS', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1223,7 +1217,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN 
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'CNSL', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1232,7 +1226,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'AOD', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1241,7 +1235,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
    READ(NUNIT,'( A )',IOSTAT=IOS) LINE
    IF ( IOS < 0 ) THEN
       CALL PremEOF ( Trim(p%AirFoil%FOILNM(NFOILID)) , 'CDO', .TRUE., ErrMessLcl )
-      close(NUNIT)
+      close(NUNIT);  NUNIT = -1
       CALL SetErrStat( ErrID_Fatal, ErrMessLcl, ErrStat, ErrMess, 'READFL')
       RETURN
    END IF
@@ -1284,23 +1278,23 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
         IF ( ABS( m%AirFoil%AL( NFOILID, I ) ) > 185.) THEN
             CALL SetErrStat( ErrID_Fatal, 'Probable error in airfoil data table number '//TRIM(Int2LStr(NFOILID))// &
                            ' Angle of attack exceeds 185 degrees.', ErrStat, ErrMess, 'READFL')   
-            CLOSE(NUNIT)
+            CLOSE(NUNIT);  NUNIT = -1
             RETURN
 
         ELSEIF (ABS( m%AirFoil%CL( NFOILID, I, IPHI ) ) > 3. ) THEN
             CALL SetErrStat( ErrID_Fatal, 'Probable error in airfoil data table number '//TRIM(Int2LStr(NFOILID))// &
                            ' Coefficient of Lift exceeds 3.0.', ErrStat, ErrMess, 'READFL')   
-            CLOSE(NUNIT)
+            CLOSE(NUNIT);  NUNIT = -1
             RETURN
         ELSEIF (ABS( m%AirFoil%CD( NFOILID, I, IPHI ) ) > 3. ) THEN
             CALL SetErrStat( ErrID_Fatal, 'Probable error in airfoil data table number '//TRIM(Int2LStr(NFOILID))// &
                            ' Coefficient of Drag exceeds 3.0.', ErrStat, ErrMess, 'READFL')   
-            CLOSE(NUNIT)
+            CLOSE(NUNIT);  NUNIT = -1
             RETURN
         ELSEIF (ABS( m%AirFoil%CM( NFOILID, I, IPHI ) ) > 3. ) THEN
             CALL SetErrStat( ErrID_Fatal, 'Probable error in airfoil data table number '//TRIM(Int2LStr(NFOILID))// &
                            ' Coefficient of Moment exceeds 3.0.', ErrStat, ErrMess, 'READFL')   
-            CLOSE(NUNIT)
+            CLOSE(NUNIT);  NUNIT = -1
             RETURN
            
            
@@ -1330,7 +1324,7 @@ DO NFOILID = 1, p%AirFoil%NUMFOIL
 
    ENDDO ! I
 
-   150 CLOSE( NUNIT )
+   150 CLOSE( NUNIT );  NUNIT = -1
 
  ! Check to see if values at 180 deg. equal those at -180 deg.
    IF (ALPosPI .AND. ALNegPI) THEN
@@ -1358,7 +1352,7 @@ END DO !NUMFOIL
 RETURN
 
 205 CALL SetErrStat( ErrID_Fatal, ' Error reading line: "'//TRIM(Line)//'" in file : "'//TRIM(P%AirFoil%FOILNM(NFOILID))//'"', ErrStat, ErrMess, 'READFL')   
-   CLOSE(NUNIT)
+   CLOSE(NUNIT);  NUNIT = -1
    RETURN
 
 RETURN
@@ -1372,7 +1366,7 @@ END SUBROUTINE READFL
 !====================================================================================================
    IMPLICIT                      NONE
       ! Passed Variables:
-   INTEGER,                      INTENT(IN)     :: UnIn
+   INTEGER,                        INTENT(INOUT)  :: UnIn
    TYPE(AD14_InitInputType),       INTENT(INOUT)  :: InitInp
    TYPE(AD14_ParameterType),       INTENT(INOUT)  :: p           ! Parameters
    TYPE(AD14_ContinuousStateType), INTENT(INOUT)  :: x           ! Initial continuous states
@@ -1395,6 +1389,7 @@ END SUBROUTINE READFL
    ! Open the file for reading
    !-------------------------------------------------------------------------------------------------
    FilName = p%TwrProps%TwrFile
+   UnIn = -1   ! set to -1 so that Open* calls will find a valid unit number
    CALL OpenFInpFile (UnIn, TRIM(FilName), ErrStat, ErrMess )
    IF ( ErrStat /= ErrID_None ) RETURN
 
@@ -4465,12 +4460,13 @@ END SUBROUTINE infupdt
 
    INTEGER                    :: i
    INTEGER                    :: NumOut
-   INTEGER, PARAMETER         :: UnDyn = 80
+   INTEGER                    :: UnDyn
 
    CHARACTER(50)              :: Frmt
 
    ErrStat = ErrID_None
    ErrMess = ""
+   UnDyn   = -1   ! set to -1 so that Open* calls will find a valid unit number
 
 !SAVE                                                   ! Save *all* local variables.  Is this necessary, or is OnePass enough.
 
