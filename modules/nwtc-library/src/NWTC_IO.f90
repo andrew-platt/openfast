@@ -2332,7 +2332,7 @@ END SUBROUTINE CheckR8Var
    END IF
 
       ! Open input file.  Make sure it worked.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='UNFORMATTED', ACCESS='STREAM', IOSTAT=ErrStat, ACTION='READ' )
@@ -2345,7 +2345,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg  = ''
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenBInpFile
@@ -2364,7 +2364,7 @@ END SUBROUTINE CheckR8Var
    ErrMsg  = ""
 
       ! Open output file.  Make sure it worked.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='UNFORMATTED' , ACCESS='STREAM', IOSTAT=ErrStat, ACTION='WRITE' )
@@ -2378,7 +2378,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg  = ''
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenBOutFile
@@ -2442,7 +2442,7 @@ END SUBROUTINE CheckR8Var
    ELSE
 
       ! Open input file.  Make sure it worked.
-      !$OMP critical
+      !$OMP critical(openfile)
       if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
       if (ErrStat==ErrID_None) then
          OPEN( Un, FILE=TRIM( InFile ), STATUS='OLD', FORM='FORMATTED', IOSTAT=IOS, ACTION='READ' )
@@ -2451,7 +2451,7 @@ END SUBROUTINE CheckR8Var
             CALL SetErrStat( ErrID_Fatal, 'Cannot open file "'//TRIM( InFile )//'".', ErrStat,ErrMsg,RoutineName)
          END IF
       endif
-      !$OMP end critical
+      !$OMP end critical(openfile)
 
    END IF
 
@@ -2474,7 +2474,7 @@ END SUBROUTINE CheckR8Var
    ErrMsg  = ""
 
       ! Open output file.  Make sure it worked.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS, ACTION="WRITE" )
@@ -2488,7 +2488,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg  = ""      
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenFOutFile
@@ -2514,7 +2514,7 @@ END SUBROUTINE CheckR8Var
    INQUIRE ( FILE=TRIM( OutFile ) , EXIST=Exists )   
 
       ! Open output file.  Make sure it worked.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM='FORMATTED', IOSTAT=IOS )
@@ -2530,7 +2530,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg = ''
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenFUnkFile
@@ -2553,7 +2553,7 @@ END SUBROUTINE CheckR8Var
    inquire(file=TRIM( OutFile ), exist=FileExists)
 
       ! Open output file.  Make sure it worked.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat2,ErrMsg2)
    if (ErrStat2/=ErrID_None) then
       IF ( PRESENT(ErrStat) )  ErrStat = ErrStat2
@@ -2581,7 +2581,7 @@ END SUBROUTINE CheckR8Var
          IF ( PRESENT(ErrMsg)  )  ErrMsg  = ""
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenFUnkFileAppend ! ( Un, OutFile [, ErrStat] [, ErrMsg] )
@@ -2646,7 +2646,7 @@ END SUBROUTINE CheckR8Var
    END IF
 
       ! Open the file.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN ( Un, FILE=TRIM( InFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='READ' )
@@ -2659,7 +2659,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg  = ''
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenUInfile
@@ -2679,7 +2679,7 @@ END SUBROUTINE CheckR8Var
    ErrMsg  = ""
 
       ! Open the file.
-   !$OMP critical
+   !$OMP critical(openfile)
    if (Un<=0) call GetNewUnit(Un,ErrStat,ErrMsg)
    if (ErrStat==ErrID_None) then
       OPEN ( Un, FILE=TRIM( OutFile ), STATUS='UNKNOWN', FORM=UnfForm, ACCESS='SEQUENTIAL', IOSTAT=IOS, ACTION='WRITE' )
@@ -2692,7 +2692,7 @@ END SUBROUTINE CheckR8Var
          ErrMsg  = ''
       END IF
    endif
-   !$OMP end critical
+   !$OMP end critical(openfile)
 
    RETURN
    END SUBROUTINE OpenUOutfile
