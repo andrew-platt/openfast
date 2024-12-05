@@ -94,7 +94,7 @@ contains
       INTEGER(IntKi)  , INTENT(  OUT)        :: ErrStat              !< error level/status of OpenFOutFile operation
       CHARACTER(*)    , INTENT(  OUT)        :: ErrMsg               !< message when error occurs
    
-      CALL GetNewUnit( Un, ErrStat, ErrMsg )      
+      Un = -1
       CALL OpenFOutFile ( Un, TRIM(FileName), ErrStat, ErrMsg )
          if (ErrStat >= AbortErrLev) return
       
@@ -158,10 +158,7 @@ contains
          closeOnReturn = .FALSE.
       END IF
       
-      !$OMP critical
-      CALL GetNewUnit( Un, ErrStat, ErrMsg )      
       CALL OpenFInpFile ( Un, TRIM(FileName), ErrStat, ErrMsg )
-      !$OMP end critical
          if (ErrStat >= AbortErrLev) return
       
        CALL ReadCom( Un, FileName, 'File header: Module Version (line 1)', ErrStat2, ErrMsg2, 0 )
@@ -360,10 +357,8 @@ contains
       INTEGER(IntKi)  , INTENT(  OUT)        :: ErrStat              !< error level/status of OpenFOutFile operation
       CHARACTER(*)    , INTENT(  OUT)        :: ErrMsg               !< message when error occurs
    
-      !$OMP critical
-      CALL GetNewUnit( Un, ErrStat, ErrMsg )      
+      Un = -1
       CALL OpenFOutFile ( Un, TRIM(FileName), ErrStat, ErrMsg )
-      !$OMP end critical
          if (ErrStat >= AbortErrLev) return
       
       WRITE(Un,'(A)')  '# vtk DataFile Version 3.0'
