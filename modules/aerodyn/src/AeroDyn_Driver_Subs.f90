@@ -216,7 +216,7 @@ subroutine Dvr_InitCase(iCase, dvr, ADI, FED, errStat, errMsg )
       call Dvr_InitializeDriverOutputs(dvr, ADI, errStat2, errMsg2); if(Failed()) return
       allocate(dvr%out%unOutFile(dvr%numTurbines))
    endif
-   dvr%out%unOutFile = -1
+   dvr%out%unOutFile = -1     ! set to -1 so that Open* calls will find a valid unit number
 
    ! --- Initialize ADI
    call Init_ADI_ForDriver(iCase, ADI, dvr, FED, dvr%dt, errStat2, errMsg2); if(Failed()) return
@@ -944,7 +944,9 @@ subroutine Dvr_ReadInputFile(fileName, dvr, errStat, errMsg )
 
    if (echo) then
       CALL OpenEcho ( UnEc, TRIM(dvr%root)//'.ech', errStat2, errMsg2 )
-         if (Failed()) return;
+      if ( ErrStat2 >= ErrID_Severe ) ErrStat2 = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+      if(Failed()) return
+
       WRITE(UnEc, '(A)') 'Echo file for AeroDyn driver input file: '//trim(filename)
       ! Write the first three lines into the echo file
       WRITE(UnEc, '(A)') trim(FileInfo_In%Lines(1))
@@ -1419,6 +1421,7 @@ subroutine Dvr_InitializeOutputs(nWT, out, numSteps, errStat, errMsg)
       numOuts = size(out%WriteOutputHdr)
 
       call AllocAry(out%outLine, numOuts-1, 'outLine', errStat, errMsg); ! NOTE: time not stored
+      if (ErrStat >= AbortErrLev) return
       out%outLine=0.0_ReKi
 
       ! --- Ascii
@@ -1447,13 +1450,12 @@ subroutine Dvr_InitializeOutputs(nWT, out, numSteps, errStat, errMsg)
             else
                sWT = ''
             endif
-            call GetNewUnit(out%unOutFile(iWT), errStat, errMsg)
-            if ( errStat >= AbortErrLev ) then
-               out%unOutFile(iWT) = -1
-               return
-            end if
             call OpenFOutFile ( out%unOutFile(iWT), trim(out%Root)//trim(sWT)//'.out', errStat, errMsg )
-            if ( errStat >= AbortErrLev ) return
+            if ( ErrStat >= ErrID_Severe ) then
+               ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+               return
+            endif
+
             write (out%unOutFile(iWT),'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using '//trim( version%Name )
             write (out%unOutFile(iWT),'(1X,A)') trim(GetNVD(out%AD_ver))
             write (out%unOutFile(iWT),'()' )    !print a blank line
@@ -1714,8 +1716,10 @@ subroutine ReadDelimFile(Filename, nCol, Array, errStat, errMsg, nHeaderLines, p
    endif
 
    ! Open file
-   call GetNewUnit(UnIn) 
-   call OpenFInpFile(UnIn, Filename_Loc, errStat2, errMsg2); if(Failed()) return 
+   UnIn = -1      ! set to -1 so that Open* calls will find a valid unit number
+   call OpenFInpFile(UnIn, Filename_Loc, errStat2, errMsg2)
+   if ( ErrStat2 >= ErrID_Severe ) ErrStat2 = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+   if(Failed()) return
    ! Count number of lines
    nLine = line_count(UnIn)
    allocate(Array(nLine-1, nCol), stat=errStat2); errMsg2='allocation failed'; if(Failed())return

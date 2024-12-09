@@ -118,7 +118,7 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, Default_DT, OutFileRoot, U
     type(AA_InputFile), intent(inout)   :: InputFileData                       ! All the data in the Noise input file
     ! Local variables:
     integer(IntKi)                :: I                                         ! loop counter
-    integer(IntKi)                :: UnIn,UnIn2                                ! Unit number for reading file
+    integer(IntKi)                :: UnIn,UnIn2                                ! Unit number for reading file (set to -1 so that Open* calls will find a valid unit number)
     character(1024)               :: ObserverFile                              ! name of the files containing obesever location
     integer(IntKi)                :: ErrStat2, IOS,cou                             ! Temporary Error status
     logical                       :: Echo                                      ! Determines if an echo file should be written
@@ -135,9 +135,10 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, Default_DT, OutFileRoot, U
     CALL GetPath( InputFile, PriPath )     ! Input files will be relative to the path where the primary input file is located.
 
     ! Open the Primary input file.
-    CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 ); call check()
+    UnIn  = -1     ! set to -1 so that Open* calls will find a valid unit number
     CALL OpenFInpFile ( UnIn, InputFile, ErrStat2, ErrMsg2 ); call check()
-    IF ( ErrStat >= AbortErrLev ) THEN
+    if ( ErrStat >= ErrID_Severe ) then
+        ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
         CALL Cleanup()
         RETURN
     END IF
@@ -163,7 +164,8 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, Default_DT, OutFileRoot, U
         ! Otherwise, open the echo file, then rewind the input file and echo everything we've read
         I = I + 1         ! make sure we do this only once (increment counter that says how many times we've read this file)
         CALL OpenEcho ( UnEc, TRIM(OutFileRoot)//'.ech', ErrStat2, ErrMsg2, AA_Ver ); call check()
-        IF ( ErrStat >= AbortErrLev ) THEN
+        if ( ErrStat >= ErrID_Severe ) then
+            ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
             CALL Cleanup()
             RETURN
         END IF
@@ -226,10 +228,12 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, Default_DT, OutFileRoot, U
     CALL ReadVar ( UnIn, InputFile, ObserverFile, ObserverFile, 'Name of file  observer locations', ErrStat2, ErrMsg2, UnEc ); call check()
     IF ( PathIsRelative( ObserverFile ) ) ObserverFile = TRIM(PriPath)//TRIM(ObserverFile)
 
-    CALL GetNewUnit( UnIn2, ErrStat2, ErrMsg2 ); call check()
-
+    UnIn2 = -1     ! set to -1 so that Open* calls will find a valid unit number
     CALL OpenFInpFile ( UnIn2, ObserverFile, ErrStat2, ErrMsg2 ); call check()
-    IF ( ErrStat >= AbortErrLev ) RETURN
+    if ( ErrStat >= ErrID_Severe ) then
+        ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+        return
+    endif
     
     ! NrObsLoc  - Nr of Observers (-):
     CALL ReadVar( UnIn2, ObserverFile, InputFileData%NrObsLoc, "NrObsLoc", "Nr of Observers (-)", ErrStat2, ErrMsg2, UnEc); call check()
@@ -345,8 +349,10 @@ SUBROUTINE ReadBLTables( InputFile, AFI, InputFileData, ErrStat, ErrMsg )
 
         call WrScr('AeroAcoustics_IO: reading BL table:'//trim(Filename))
 
-        CALL GetNewUnit(UnIn, ErrStat2, ErrMsg2); if(Failed()) return
-        CALL OpenFInpFile(UnIn, FileName, ErrStat2, ErrMsg2); if(Failed()) return
+        UnIn = -1     ! set to -1 so that Open* calls will find a valid unit number
+        CALL OpenFInpFile(UnIn, FileName, ErrStat2, ErrMsg2)
+        if ( ErrStat2 >= ErrID_Severe ) ErrStat2 = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+        if(Failed()) return
 
         CALL ReadCom(UnIn, FileName, "! Boundary layer", ErrStat2, ErrMsg2); if(Failed()) return
         CALL ReadCom(UnIn, FileName, "! Legend: aoa", ErrStat2, ErrMsg2); if(Failed()) return
@@ -447,8 +453,10 @@ SUBROUTINE ReadTICalcTables(InputFile, InputFileData, ErrStat, ErrMsg)
 
     FileName = TRIM(PriPath)//InputFileData%TICalcTabFile
 
-    CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2); call check()
-    CALL OpenFInpFile ( UnIn, FileName, ErrStat2, ErrMsg2 ); if(Failed()) return
+    UnIn = -1     ! set to -1 so that Open* calls will find a valid unit number
+    CALL OpenFInpFile ( UnIn, FileName, ErrStat2, ErrMsg2 )
+    if ( ErrStat2 >= ErrID_Severe ) ErrStat2 = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+    if(Failed()) return
     CALL ReadCom(UnIn, FileName, 'Text Line', ErrStat2, ErrMsg2); call check()
     CALL ReadVar(UnIn, FileName, InputFileData%AvgV, 'AvgV',   'Echo flag', ErrStat2, ErrMsg2); call check()
     CALL ReadCom(UnIn, FileName, 'Text Line', ErrStat2, ErrMsg2); call check()
@@ -629,14 +637,12 @@ subroutine AA_InitializeOutputFile(p, InputFileData,InitOut,errStat, errMsg)
 
    ! FIRST FILE
    IF (InputFileData%NrOutFile .gt.0) THEN
-      call GetNewUnit( p%unOutFile, ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) then
-         p%unOutFile = -1
-         return
-      end if
-
+      p%unOutFile  = -1;   ! set to -1 so that Open* calls will find a valid unit number
       call OpenFOutFile ( p%unOutFile, trim(InputFileData%AAOutFile(1)), ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) return
+      if ( ErrStat >= ErrID_Severe ) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
 
       write (p%unOutFile,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using AA '//trim(GetNVD(InitOut%ver))
       write (p%unOutFile,'(A)')  ''
@@ -663,13 +669,12 @@ subroutine AA_InitializeOutputFile(p, InputFileData,InitOut,errStat, errMsg)
    ENDIF
    ! SECOND FILE
    IF (InputFileData%NrOutFile .gt. 1) THEN
-      call GetNewUnit( p%unOutFile2, ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) then
-         p%unOutFile = -1
-         return
-      end if
+      p%unOutFile2 = -1;   ! set to -1 so that Open* calls will find a valid unit number
       call OpenFOutFile ( p%unOutFile2, trim(InputFileData%AAOutFile(2)), ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) return
+      if ( ErrStat >= ErrID_Severe ) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
       write (p%unOutFile2,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using AA '//trim(GetNVD(InitOut%Ver))
       write (p%unOutFile2,'(A)')  ''
       write( p%unOutFile2,'(A,I5,A,I5)' )      'Number of observers      :', p%NrObsLoc,';  Number of frequencies    :', size(p%FreqList)
@@ -699,13 +704,12 @@ subroutine AA_InitializeOutputFile(p, InputFileData,InitOut,errStat, errMsg)
    ENDIF
    ! THIRD FILE
    IF (InputFileData%NrOutFile .gt. 2) THEN
-      call GetNewUnit( p%unOutFile3, ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) then
-         p%unOutFile = -1
-         return
-      end if
+      p%unOutFile3 = -1;   ! set to -1 so that Open* calls will find a valid unit number
       call OpenFOutFile ( p%unOutFile3, trim(InputFileData%AAOutFile(3)), ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) return
+      if ( ErrStat >= ErrID_Severe ) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
       write (p%unOutFile3,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using AA '//trim(GetNVD(InitOut%Ver))
       write (p%unOutFile3,'(A)')  ''
       write( p%unOutFile3,'(A,I5,A,I5)' )      'Number of observers      :', p%NrObsLoc,';  Number of frequencies    :', size(p%FreqList)
@@ -733,13 +737,12 @@ subroutine AA_InitializeOutputFile(p, InputFileData,InitOut,errStat, errMsg)
    ENDIF
    ! FOURTH FILE
    IF (InputFileData%NrOutFile .gt. 3) THEN
-      call GetNewUnit( p%unOutFile4, ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) then
-         p%unOutFile = -1
-         return
-      end if
+      p%unOutFile4 = -1;   ! set to -1 so that Open* calls will find a valid unit number
       call OpenFOutFile ( p%unOutFile4, trim(InputFileData%AAOutFile(4)), ErrStat, ErrMsg )
-      if ( ErrStat >= AbortErrLev ) return
+      if ( ErrStat >= ErrID_Severe ) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
       write (p%unOutFile4,'(/,A)')  'Predictions were generated on '//CurDate()//' at '//CurTime()//' using AA '//trim(GetNVD(InitOut%Ver))
       write (p%unOutFile4,'()')
       write( p%unOutFile4,'(A,I5)' )      'Number of observers      :', p%NrObsLoc, ';        Number of blades         :', p%numBlades,'     Number of nodes per blade:', p%NumBlNds

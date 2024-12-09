@@ -2392,16 +2392,20 @@ subroutine WriteDEBUGValuesToFile(t, u, p, x, xd, z, OtherState, m, AFInfo)
    integer,  save         :: DEBUG_BLADE
    integer,  save         :: DEBUG_BLADENODE
    integer,  save         :: DEBUG_nStep = 1
-   integer,  save         :: DEBUG_FILE_UNIT
+   integer,  save         :: DEBUG_FILE_UNIT = -1     ! set to -1 so that Open* calls will find a valid unit number
 
 !   character(*), parameter               :: RoutineName = 'BEMT_UnCoupledSolve'
    
+   UnOut = -1           ! set to -1 so that Open* calls will find a valid unit number
    DEBUG_BLADE     = 1 !size(u%Vx,2)
    DEBUG_BLADENODE = 23 !max(1, size(u%Vx,1) / 2 )
    
    if (DEBUG_nStep == 1) then
-      call GetNewUnit(DEBUG_FILE_UNIT, ErrStat, ErrMsg )
       call OpenFOutFile ( DEBUG_FILE_UNIT, "CheckBEMT.inputs.out", ErrStat, ErrMsg )
+      if (ErrStat >= ErrID_Severe) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
       
       WRITE(DEBUG_FILE_UNIT,'(A7,200(1x,A15))') "Step","IsGeomPhi","Time", "GeomPhi", "phi" &
                                              , "chi0", "omega", "Un_disk", "TSR" &
@@ -2439,8 +2443,11 @@ subroutine WriteDEBUGValuesToFile(t, u, p, x, xd, z, OtherState, m, AFInfo)
    ! now write the residual function to a separate file:
    if ((DEBUG_nStep >= 0).AND.(DEBUG_nStep <= 450000).AND.(MOD(DEBUG_nStep,25) == 0)) then
                                              
-      call GetNewUnit( UnOut, ErrStat, ErrMsg )
       call OpenFOutFile ( UnOut, "CheckBEMT.residual."//trim(num2lstr(DEBUG_nStep))//".out", ErrStat, ErrMsg )
+      if (ErrStat >= ErrID_Severe) then
+         ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+         return
+      endif
       !WRITE(UnOut, '(2(A15,1x),A2,5(1x,A15))') 'phi', 'residual', 'OK', 'AxialInd', 'TangentialInd', 'k', 'kp'
 
       do ii = 1, numPhi

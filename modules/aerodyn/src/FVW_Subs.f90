@@ -99,6 +99,7 @@ subroutine Output_Gamma(CP, Gamma_LL, iW, iStep, iLabel, iIter)
    ! TODO output folder
    CALL MKDIR('Gamma')
    write(filename,'(A,I0,A,I0,A,I0,A,I0,A)')'Gamma/Gamma_step',int(iStep),'_lab',iLabel,'_it',iIter,'_Wing',int(iW),'.txt'
+!FIXME: no error handling here
    OPEN(unit = iUnit, file = trim(filename), status="unknown", action="write")
    write(iUnit,'(A)') 'norm_[m],x_[m],y_[m],z_[m], Gamma_[m^2/s]'
    do i=1,size(Gamma_LL)
@@ -130,9 +131,11 @@ subroutine ReadAndInterpGamma(CirculationFileName, s_CP_LL, L, Gamma_CP_LL, ErrS
    real(ReKi), parameter :: ReNaN = huge(1.0_ReKi)
    ErrStat = ErrID_None
    ErrMsg  = ''
+   iUnit   = -1   ! set to -1 so that Open* calls will find a valid unit number
    ! ---
-   call GetNewUnit(iUnit)
-   call OpenFInpFile(iUnit, CirculationFileName, errStat2, errMsg2); if(Failed()) return
+   call OpenFInpFile(iUnit, CirculationFileName, errStat2, errMsg2)
+   if (ErrStat2 >= ErrID_Severe) ErrStat2 = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
+   if(Failed()) return
    nLines=line_count(iUnit)-1
    ! Read Header
    read(iUnit,*, iostat=errStat2) line ; if(Failed()) return

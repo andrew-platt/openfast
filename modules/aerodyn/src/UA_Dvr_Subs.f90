@@ -56,15 +56,16 @@ module UA_Dvr_Subs
 
    
          ! Initialize the echo file unit to -1 which is the default to prevent echoing, we will alter this based on user input
-      UnEchoLocal = -1
+      UnEchoLocal = -1     ! set to -1 at start to find valid unit numbers in Open* calls
+      UnIn        = -1     ! set to -1 at start to find valid unit numbers in Open* calls
       ErrStat     = ErrID_None
       ErrMsg      = ''
       FileName = trim(inputFile)
    
-      call GetNewUnit( UnIn )   
       call OpenFInpFile( UnIn, FileName, errStat2, errMsg2 )
          call SetErrStat(errStat2, errMsg2, ErrStat, ErrMsg, RoutineName )
-         if (ErrStat >= AbortErrLev) then
+         if (ErrStat >= ErrID_Severe) then
+            ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we can't continue
             call Cleanup()
             return
          end if
@@ -110,10 +111,10 @@ module UA_Dvr_Subs
       if ( InitInp%Echo ) then
       
          EchoFile = TRIM(FileName)//'.ech'
-         call GetNewUnit( UnEchoLocal )   
          call OpenEcho ( UnEchoLocal, EchoFile, errStat2, errMsg2 )
             call SetErrStat(errStat2, errMsg2, ErrStat, ErrMsg, RoutineName )
-            if (ErrStat >= AbortErrLev) then
+            if (ErrStat >= ErrID_Severe) then
+               ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we don't want to continue
                call Cleanup()
                return
             end if
@@ -428,13 +429,14 @@ module UA_Dvr_Subs
       ErrStat     = ErrID_None
       ErrMsg      = ''
       nSimSteps   = 0 ! allocate here in case errors occur
+      UnIn        = -1  ! set to -1 at start to find valid unit numbers in Open* calls
       
       FileName = trim(inputsFile)
       
-      call GetNewUnit( UnIn )   
       call OpenFInpFile( UnIn, FileName, errStat2, errMsg2 )
          call SetErrStat(errStat2, errMsg2, ErrStat, ErrMsg, RoutineName )
-         if (ErrStat >= AbortErrLev) then
+         if (ErrStat >= ErrID_Severe) then
+            ErrStat = ErrID_Fatal      ! failure to get a new unit will be severe, not fatal.  But we can't continue
             call Cleanup()
             return
          end if
@@ -635,6 +637,7 @@ module UA_Dvr_Subs
       integer :: iTab, iRow, iStartUA
       type(AFI_Table_Type), pointer :: tab !< Alias
 
+
       if (UA_f_cn) then
          Prefix='Cn_'
          sFullyAtt='Cn_FullyAtt'
@@ -682,12 +685,9 @@ module UA_Dvr_Subs
          call kernelSmoothing(tab%alpha, tab%Coefs(:,AFI_Params%ColCl), kernelType_TRIWEIGHT, 2.0_ReKi*D2R, cl_smooth)
 
          ! Write to file
-
-         CALL GetNewUnit( unOutFile, ErrStat, ErrMsg )
-         IF ( ErrStat /= ErrID_None ) RETURN
-
+         unOutFile = -1    ! set to -1 so that Open* calls will find a valid unit number
          CALL OpenFOutFile ( unOutFile, trim(OutRootName)//'.UA.Coefs.'//trim(num2lstr(iTab))//'.out', ErrStat, ErrMsg )
-            if (ErrStat >= AbortErrLev) then
+            if (ErrStat >= ErrID_Severe) then   ! Severe if unit can't be found, but we may want to continue
                call WrScr(Trim(ErrMsg))
                return
             end if
