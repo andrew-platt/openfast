@@ -1068,6 +1068,8 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    
       !--------------------
       ! 1b. CALL AWAE_CO      
+write(20001,*) '    ==========================='
+write(20001,*) '    call AWAE_CalcOutput'
    call AWAE_CalcOutput( 0.0_DbKi, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
                      farm%AWAE%OtherSt, farm%AWAE%y, farm%AWAE%m, ErrStat2, ErrMsg2 )         
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1075,6 +1077,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
       !--------------------
       ! 1c. transfer y_AWAE to u_F and u_WD         
    
+write(20001,*) '    call Transfer_AWAE_to_WD'
    call Transfer_AWAE_to_WD(farm)   
 
    if (farm%p%UseSC) then
@@ -1108,6 +1111,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
          
    DO nt = 1,farm%p%NumTurbines
       
+write(20001,*) '    call FWrap_t0    nt',nt
       call FWrap_t0( farm%FWrap(nt)%u, farm%FWrap(nt)%p, farm%FWrap(nt)%x, farm%FWrap(nt)%xd, farm%FWrap(nt)%z, &
                      farm%FWrap(nt)%OtherSt, farm%FWrap(nt)%y, farm%FWrap(nt)%m, ErrStat2, ErrMsg2 )         
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'T'//trim(num2lstr(nt))//':'//RoutineName)
@@ -1133,6 +1137,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
       !--------------------
       ! 2.  Transfer y_F to u_WD     
    
+write(20001,*) '    call Transfer_FAST_to_WD'
    call Transfer_FAST_to_WD(farm)
       
    !.......................................................................................
@@ -1141,6 +1146,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    
    DO nt = 1,farm%p%NumTurbines
       
+write(20001,*) '    call WD_CalcOutput',nt
       call WD_CalcOutput( 0.0_DbKi, farm%WD(nt)%u, farm%WD(nt)%p, farm%WD(nt)%x, farm%WD(nt)%xd, farm%WD(nt)%z, &
                      farm%WD(nt)%OtherSt, farm%WD(nt)%y, farm%WD(nt)%m, ErrStat2, ErrMsg2 )         
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'T'//trim(num2lstr(nt))//':'//RoutineName)
@@ -1152,12 +1158,14 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    ! Transfer y_WD to u_AWAE
    !.......................................................................................
    
+write(20001,*) '    call Transfer_WD_to_AWAE'
    call Transfer_WD_to_AWAE(farm)
    
    !.......................................................................................
    ! CALL AWAE_CO
    !.......................................................................................
    
+write(20001,*) '    call AWAE_CalcOutput'
    call AWAE_CalcOutput( 0.0_DbKi, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
                      farm%AWAE%OtherSt, farm%AWAE%y, farm%AWAE%m, ErrStat2, ErrMsg2 )         
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1167,12 +1175,14 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    ! Transfer y_AWAE to u_F and u_WD
    !.......................................................................................
 
+write(20001,*) '    call Transfer_AWAE_to_WD'
    call Transfer_AWAE_to_WD(farm)   
    
    !.......................................................................................
    ! Write Output to File
    !.......................................................................................
    
+write(20001,*) '    call Farm_WriteOutput'
    call Farm_WriteOutput(0, 0.0_DbKi, farm, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    

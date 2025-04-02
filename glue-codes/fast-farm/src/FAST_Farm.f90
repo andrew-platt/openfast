@@ -106,6 +106,8 @@ type(All_FastFarm_Data)               :: farm
          
       CALL SimStatus_FirstTime( PrevSimTime, PrevClockTime, SimStrtTime, SimStrtCPU, t, farm%p%TMax )
          
+write(20001,*) '=================================================='
+write(20001,*) 'call FARM_InitialCO'
       call FARM_InitialCO(farm, ErrStat, ErrMsg)   
          CALL CheckError( ErrStat, ErrMsg, 'during initial calculate output' )
       
@@ -136,6 +138,8 @@ type(All_FastFarm_Data)               :: farm
       t = n_t_global*farm%p%DT_low
       
 
+write(20001,*) '=================================================='
+write(20001,*) 'call FARM_UpdateStates'
       CALL FARM_UpdateStates(t, n_t_global, farm, ErrStat, ErrMsg)   
      
       CALL CheckError( ErrStat, ErrMsg  )
@@ -143,6 +147,8 @@ type(All_FastFarm_Data)               :: farm
       t = (n_t_global+1)*farm%p%DT_low
       
 
+write(20001,*) '=================================================='
+write(20001,*) 'call FARM_CalcOutput'
       CALL FARM_CalcOutput(t, farm, ErrStat, ErrMsg)   
 
       CALL CheckError( ErrStat, ErrMsg  )

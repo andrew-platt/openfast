@@ -197,13 +197,17 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
    real(ReKi)     :: xHat_plane(3), yHat_plane(3), zHat_plane(3)
    real(ReKi)     :: y_tmp_plane
    real(ReKi)     :: z_tmp_plane
+integer :: id
 
+id=OMP_GET_THREAD_NUM()
+write(20001,'(i5,28x,a34,i4)') id,'start interp_planes_2_point maxPln',maxPln
    !x_end_plane = dot_product(u%xhat_plane(:,0,iWT), (GridP(:) - u%p_plane(:,0,iWT)) )
    x_end_plane =  u%xhat_plane(1,0,iWT) * (GridP(1) - u%p_plane(1,0,iWT)) &
               &+  u%xhat_plane(2,0,iWT) * (GridP(2) - u%p_plane(2,0,iWT)) &
               &+  u%xhat_plane(3,0,iWT) * (GridP(3) - u%p_plane(3,0,iWT)) 
 
    do np = 0, maxPln !p%NumPlanes-2
+!write(20001,'(i5,31x,a15,i4)') id,'np            ',np
       np1 = np + 1
       ! Construct the endcaps of the current wake plane volume
       x_start_plane = x_end_plane
@@ -211,10 +215,13 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
       x_end_plane = u%xhat_plane(1,np1,iWT) * (GridP(1) - u%p_plane(1,np1,iWT)) &
                  &+ u%xhat_plane(2,np1,iWT) * (GridP(2) - u%p_plane(2,np1,iWT)) &
                  &+ u%xhat_plane(3,np1,iWT) * (GridP(3) - u%p_plane(3,np1,iWT)) 
+!write(20001,'(i5,31x,a15,i4)') id,'x_start_plane ',x_start_plane
+!write(20001,'(i5,31x,a15,i4)') id,'x_end_plane   ',x_end_plane
 
       ! test if the point is within the endcaps of the wake volume
       if ( ( ( x_start_plane >= 0.0_ReKi ) .and. ( x_end_plane < 0.0_ReKi ) ) .or. &
            ( ( x_start_plane <= 0.0_ReKi ) .and. ( x_end_plane > 0.0_ReKi ) )        ) then
+write(20001,'(i5,31x,a15)') id,'in grid '
 
          ! Plane interpolation factor
          if ( EqualRealNos( x_start_plane, x_end_plane ) ) then
@@ -253,6 +260,7 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
 
          ! test if the point is within finite-difference grid
          if ( (abs(y_tmp_plane) <= p%y(p%numRadii-1)).and.(abs(z_tmp_plane) <= p%z(p%numRadii-1)) ) then 
+write(20001,'(i5,31x,a15)') id,'in finite-diff grid '
             ! Increment number of wakes contributing to current grid point
             iw = iw + 1
 
@@ -278,6 +286,7 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
          end if  ! if the point is within radial finite-difference grid
       end if  ! if the point is within the endcaps of the wake volume
    end do     ! np = 0, p%NumPlanes-2
+write(20001,'(i5,28x,a25)') id,'end interp_planes_2_point'
 
 endsubroutine interp_planes_2_point
 
@@ -658,7 +667,7 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    real(ReKi), allocatable :: wk_R_p2i(:,:,:)!< Orientations from plane to inertial for each wake, shape: 3x3xnWake
    real(ReKi), allocatable :: wk_V(:,:)      !< Wake velocity from each overlapping wake,  shape: 3xnWake
    real(ReKi), allocatable :: wk_WAT_k(:)    !< WAT scaling factors for all wakes (for overlap)
-   integer(IntKi)      :: np1
+!   integer(IntKi)      :: np1
    integer(IntKi)      :: iXYZ !< Flat counter on X,Y,Z high res grid
    integer(IntKi)      :: maxPln
    integer(IntKi)      :: maxN_wake
@@ -667,6 +676,7 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    integer(IntKi)      :: WAT_iT,WAT_iY,WAT_iZ  !< indexes for WAT point (Time interchangeable with X)
    integer(IntKi)      :: errStat2
    character(*), parameter   :: RoutineName = 'HighResGridCalcOutput'
+integer :: id
    errStat = ErrID_None
    errMsg  = ""
 
@@ -680,15 +690,20 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    end if
 
    maxN_wake = p%NumTurbines*( p%NumPlanes-1 )
+write(20001,*) '                =========================='
+write(20001,*) '                allocate wk_R_p2i'
    ! Variables stored for each wake crossing at a given point
    allocate ( wk_R_p2i    (3, 3, 1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_R_p2i.', errStat, errMsg, RoutineName )
+write(20001,*) '                allocate wk_V'
    allocate ( wk_V        (   3, 1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_V.', errStat, errMsg, RoutineName )
+write(20001,*) '                allocate wk_WAT_k'
    allocate ( wk_WAT_k    (      1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_WAT_k.', errStat, errMsg, RoutineName )
    if (ErrStat >= AbortErrLev) return
 
    ! Convect WAT Box tracer for each intermediate step
    ! Note: we substract because the high-res points are "before" current low res point
    if (p%WAT_Enabled) then
+write(20001,*) '                allocate WAT_B_BoxHi'
       allocate ( WAT_B_BoxHi    ( 3, 0:n_high_low), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for WAT_B_BoxHi.', errStat, errMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
       do i_hl=0, n_high_low
@@ -705,17 +720,27 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
    do nt = 1,p%NumTurbines
       ! set the disturbed flow equal to the ambient flow for this time step
+write(20001,*) '            copy high for turb ',nt
+write(20001,*) '            shape(m%Vamb_high(nt)%data)  ',shape(m%Vamb_high(nt)%data) 
+write(20001,*) '            shape(y%Vdist_high(nt)%data) ',shape(y%Vdist_high(nt)%data)
+write(20001,*) '            shape(wk_R_p2i) ',shape(wk_R_p2i)
+write(20001,*) '            shape(wk_V    ) ',shape(wk_V    )
+write(20001,*) '            shape(wk_WAT_k) ',shape(wk_WAT_k)
+write(20001,*) '            NumGrid_high    ',NumGrid_high
       y%Vdist_high(nt)%data = m%Vamb_high(nt)%data
 
+write(20001,*) '            loop over points'
       !$OMP PARALLEL DO DEFAULT(NONE) &
       !$OMP PRIVATE (iXYZ, ix, iy, iz, n_wake, nt2, np,&
       !$OMP&         wk_R_p2i, wk_V, &
       !$OMP&         V_qs, &
+      !$OMP&         id, &
       !$OMP&         i_hl, Pos_global,&
       !$OMP&         wk_WAT_k, WAT_k, WAT_iT, WAT_iY, WAT_iZ, WAT_V)& 
-      !$OMP SHARED(NumGrid_High, m, u, p, y, xd, nt, maxPln, n_high_low, WAT_B_BoxHi, errStat, errMsg)
+      !$OMP SHARED(NumGrid_high, m, u, p, y, xd, nt, maxPln, n_high_low, WAT_B_BoxHi)
       ! Loop over all points of the high resolution ambient wind
       do iXYZ=1, NumGrid_high
+id=OMP_GET_THREAD_NUM()
          ! From flat index iXYZ to grid indices
          ix = mod(     (iXYZ-1)                          ,p%nX_high)
          iy = mod(int( (iXYZ-1) / (p%nX_high          ) ),p%nY_high)
@@ -723,18 +748,24 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
          ! --- Compute variables wk_* (e.g. velocity) from each wakes reaching the current grid point 
          n_wake = 0 ! cumulative index, increases if point is at intersection of multiple wakes
+write(20001,'(i5,15x,a6,i6)') id,'iXYZ',iXYZ
          do nt2 = 1,p%NumTurbines
             if (nt /= nt2) then
+write(20001,'(i5,20x,a30,2x,i3,2x,a10,2x,i3)') id,'call interp_planes_2_point nt2',nt2,'n_wake ',n_wake
+!write(20001,'(i5,25x,a32,2x,3f10.3,2x,a10,2x,i3,a10,2x,i3)') id,'p%Grid_high(:,iXYZ,nt))',p%Grid_high(:,iXYZ,nt),'   maxPln ',maxPln,' n_wake ',n_wake
                call interp_planes_2_point(u, p, m, p%Grid_high(:,iXYZ,nt), nt2, maxPln, &  ! In
                   n_wake, wk_R_p2i, wk_V, wk_WAT_k )                                       ! InOut
+write(20001,'(i5,20x,a30)') id,'end call interp_planes_2_point'
             end if    ! nt /= nt2
          end do        ! nt2 = 1,p%NumTurbines
          if (n_wake > 0) then
             ! --- Compute merged wake velocity V_qs
+!write(20001,*) id,'                      call mergeWakeVel'
             call mergeWakeVel(n_wake, wk_V, wk_R_p2i, V_qs)
 
             ! --- Compute average WAT scaling factor and WAT velocity
             if (p%WAT_Enabled) then
+!write(20001,*) id,'                      call mergeWakeWAT_k'
                call mergeWakeWAT_k(n_wake, wk_WAT_k, WAT_k)
                ! Position of current grid point
                Pos_global(1) = real(ix,ReKi) * p%dX_high(nt) + p%X0_high(nt)
@@ -1451,24 +1482,30 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    ! some variables and indexing
    n = nint(t / p%dt_low)
    n_high =  n*p%n_high_low
+write(20001,*) '          ======================'
+write(20001,*) '          call ComputLocals'
    call ComputeLocals(n, u, p, y, m, errStat2, errMsg2);                if (Failed()) return;
 
    ! high-res
+write(20001,*) '          call HighResGridCalcOutput'
    call HighResGridCalcOutput(n_high, u, p, xd, y, m, errStat2, errMsg2);   if (Failed()) return;
 
    ! low-res
+write(20001,*) '          call LowResGridCalcOutput'
    call LowResGridCalcOutput(n, u, p, xd, y, m, errStat2, errMsg2);         if (Failed()) return;
 
 
    if (mod(n,p%WrDisSkp1) == 0) then
 
       if ( p%WrDisWind  ) then
+write(20001,*) '          call WriteDisWindFiles'
          call WriteDisWindFiles( n, p%WrDisSkp1, p, y, m, ErrStat2, ErrMsg2 )
       end if
 
       ! TimeStamp
       write(Tstr, '(i' // trim(Num2LStr(p%VTK_tWidth)) //'.'// trim(Num2LStr(p%VTK_tWidth)) // ')') n/p%WrDisSkp1 ! TODO use n instead..
 
+write(20001,*) '          XY slice'
          ! XY plane slices
       do k = 1,p%NOutDisWindXY
          write(PlaneNumStr, '(i3.3)') k
@@ -1479,6 +1516,7 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
          call WrVTK_SP_vectors3D( Un, "Velocity", (/p%nX_low,p%nY_low,1_IntKi/), (/p%X0_low,p%Y0_low,p%OutDisWindZ(k)/), (/p%dX_low,p%dY_low,p%dZ_low/), m%outVizXYPlane, ErrStat2, ErrMsg2 );   if (Failed()) return;
       end do
 
+write(20001,*) '          YZ slice'
          ! YZ plane slices
       do k = 1,p%NOutDisWindYZ
          write(PlaneNumStr, '(i3.3)') k
@@ -1489,6 +1527,7 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
          call WrVTK_SP_vectors3D( Un, "Velocity", (/1,p%nY_low,p%nZ_low/), (/p%OutDisWindX(k),p%Y0_low,p%Z0_low/), (/p%dX_low,p%dY_low,p%dZ_low/), m%outVizYZPlane, ErrStat2, ErrMsg2 );   if (Failed()) return;
       end do
 
+write(20001,*) '          XZ slice'
          ! XZ plane slices
       do k = 1,p%NOutDisWindXZ
          write(PlaneNumStr, '(i3.3)') k
