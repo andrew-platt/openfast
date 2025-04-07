@@ -150,6 +150,8 @@ typedef   ^ MiscVarType    InflowWind_OutputType   y_IfW_High  - - -  "InflowWin
 #wake added turbulence
 typedef   ^ MiscVarType    ReKi     V_amb_low_disk       {:}{:} - -  "Rotor averaged ambiend wind speed for each wind turbine (3 x nWT)" m/s
 
+#Temporary for checking!!!!! Remove this later
+typedef   ^ MiscVarType    SiKi     Vamb_low_orig     {:}{:}{:}{:} - -  "UVW components of ambient wind across the low-resolution domain throughout the farm" m/s
 
 # ..... Parameters ................................................................................................................
 # Define parameters here:

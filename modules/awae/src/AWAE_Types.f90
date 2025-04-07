@@ -173,6 +173,7 @@ IMPLICIT NONE
     TYPE(InflowWind_OutputType)  :: y_IfW_Low      !< InflowWind module outputs for the low-resolution grid [-]
     TYPE(InflowWind_OutputType)  :: y_IfW_High      !< InflowWind module outputs for the high-resolution grid [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: V_amb_low_disk      !< Rotor averaged ambiend wind speed for each wind turbine (3 x nWT) [m/s]
+    REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Vamb_low_orig      !< UVW components of ambient wind across the low-resolution domain throughout the farm [m/s]
   END TYPE AWAE_MiscVarType
 ! =======================
 ! =========  AWAE_ParameterType  =======
@@ -1622,6 +1623,18 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%V_amb_low_disk = SrcMiscData%V_amb_low_disk
    end if
+   if (allocated(SrcMiscData%Vamb_low_orig)) then
+      LB(1:4) = lbound(SrcMiscData%Vamb_low_orig)
+      UB(1:4) = ubound(SrcMiscData%Vamb_low_orig)
+      if (.not. allocated(DstMiscData%Vamb_low_orig)) then
+         allocate(DstMiscData%Vamb_low_orig(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3),LB(4):UB(4)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%Vamb_low_orig.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%Vamb_low_orig = SrcMiscData%Vamb_low_orig
+   end if
 end subroutine
 
 subroutine AWAE_DestroyMisc(MiscData, ErrStat, ErrMsg)
@@ -1706,6 +1719,9 @@ subroutine AWAE_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%V_amb_low_disk)) then
       deallocate(MiscData%V_amb_low_disk)
    end if
+   if (allocated(MiscData%Vamb_low_orig)) then
+      deallocate(MiscData%Vamb_low_orig)
+   end if
 end subroutine
 
 subroutine AWAE_PackMisc(RF, Indata)
@@ -1752,6 +1768,7 @@ subroutine AWAE_PackMisc(RF, Indata)
    call InflowWind_PackOutput(RF, InData%y_IfW_Low) 
    call InflowWind_PackOutput(RF, InData%y_IfW_High) 
    call RegPackAlloc(RF, InData%V_amb_low_disk)
+   call RegPackAlloc(RF, InData%Vamb_low_orig)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1809,6 +1826,7 @@ subroutine AWAE_UnPackMisc(RF, OutData)
    call InflowWind_UnpackOutput(RF, OutData%y_IfW_Low) ! y_IfW_Low 
    call InflowWind_UnpackOutput(RF, OutData%y_IfW_High) ! y_IfW_High 
    call RegUnpackAlloc(RF, OutData%V_amb_low_disk); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Vamb_low_orig); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine AWAE_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
