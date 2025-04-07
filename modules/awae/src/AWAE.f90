@@ -1322,9 +1322,11 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
 
    if ( p%Mod_AmbWind == 1 ) then
          ! read from file the ambient flow for the n+1 time step
-      if (n<2_IntKi) then  !only read if on n=1 or n=0 (not sure where we start)
+      if (n<1_IntKi) then  !only read if on n=1 or n=0 (not sure where we start)
       call ReadLowResWindFile(n+1, p, m%Vamb_Low, errStat2, errMsg2);   if (Failed()) return;
-      call AllocAry(m%Vamb_Low_orig, size(m%Vamb_low,DIM=1), size(m%Vamb_low,DIM=2), size(m%Vamb_low,DIM=3), size(m%Vamb_low,DIM=4), 'm%Vamb_Low_orig', ErrStat2, ErrMsg2); if(Failed()) return;
+      if (.not. allocated(m%Vamb_Low_orig)) then
+         call AllocAry(m%Vamb_Low_orig, size(m%Vamb_low,DIM=1), size(m%Vamb_low,DIM=2), size(m%Vamb_low,DIM=3), size(m%Vamb_low,DIM=4), 'm%Vamb_Low_orig', ErrStat2, ErrMsg2); if(Failed()) return;
+      endif
       m%Vamb_Low_orig = m%Vamb_Low
       else
       m%Vamb_Low = m%Vamb_Low_orig
