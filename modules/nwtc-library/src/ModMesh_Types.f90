@@ -98,6 +98,13 @@ MODULE ModMesh_Types
      TYPE(ElemRecType), POINTER :: Element => NULL()        !< pointer to a particular mesh element
    END TYPE ElemListType
 
+   TYPE, PUBLIC :: MeshVizType
+      INTEGER(IntKi)          :: VizType                     !< Visualization type identifier
+      REAL(SiKi), allocatable :: Radius(:)                   !< Scaling factor for profile
+      REAL(SiKi), allocatable :: Profile(:,:,:)              !< XY point coordinates of profile at nodes ([X,Y],Node)
+      INTEGER(IntKi), allocatable :: Connectivity(:,:)       !< Node connectivity (list of pairs of connected nodes)
+   END TYPE MeshVizType
+
       !> mesh data structure
    TYPE, PUBLIC :: MeshType
       LOGICAL :: initialized = .FALSE.                       !< Indicate whether this mesh is initialized
@@ -108,6 +115,7 @@ MODULE ModMesh_Types
       INTEGER :: refNode = 0                                 !< optional reference node (informational only)
       INTEGER :: Nnodes = 0                                  !< Number of nodes (vertices) in mesh
       INTEGER :: ID = 0                                      !< Mesh identifier (used during init)
+      CHARACTER(64) :: Name                                  !< Mesh name
 
      ! Mesh elements
       TYPE(ElemTabType), POINTER :: ElemTable(:) => NULL()   !< A table of all elements in the mesh, by type
@@ -146,6 +154,9 @@ MODULE ModMesh_Types
 
      ! Keeping track of siblings:
       TYPE(MeshType),POINTER :: SiblingMesh      => NULL() !< Pointer to mesh's (only) sibling
+
+      ! Mesh visualization information
+      TYPE(MeshVizType)      :: Viz
 
    END TYPE MeshType
 
