@@ -1349,6 +1349,9 @@ SUBROUTINE MeshWrVTK_PointSurface ( RefPoint, M, FileRootName, VTKcount, OutputF
          
       END IF
       
+      !> Set no visualization
+      BlankMesh%Viz%Name = ""
+      BlankMesh%Viz%VizType = MESH_VIZTYPE_NONE
 
       RETURN
 
@@ -1398,6 +1401,12 @@ SUBROUTINE MeshWrVTK_PointSurface ( RefPoint, M, FileRootName, VTKcount, OutputF
       IF ( ALLOCATED(Mesh%TranslationAcc) ) DEALLOCATE(Mesh%TranslationAcc)
       IF ( ALLOCATED(Mesh%Scalars)        ) DEALLOCATE(Mesh%Scalars)
       
+      ! Remove vizualization info
+      Mesh%Viz%Name    = ""
+      Mesh%Viz%VizType = MESH_VIZTYPE_NONE
+      IF ( ALLOCATED(Mesh%Viz%Radius)       ) DEALLOCATE(Mesh%Viz%Radius)
+      IF ( ALLOCATED(Mesh%Viz%Profile)      ) DEALLOCATE(Mesh%Viz%Profile)
+      IF ( ALLOCATED(Mesh%Viz%Connectivity) ) DEALLOCATE(Mesh%Viz%Connectivity)
 
 !bjj: if we keep the sibling, deleting this table is going to be a problem
 
@@ -2019,10 +2028,15 @@ SUBROUTINE MeshWrVTK_PointSurface ( RefPoint, M, FileRootName, VTKcount, OutputF
       IF ( ALLOCATED(SrcMesh%Scalars        ) .AND. ALLOCATED(DestMesh%Scalars        ) ) DestMesh%Scalars = SrcMesh%Scalars
 
 
-      IF ( ALLOCATED(SrcMesh%Viz%Scalar     ) .AND. ALLOCATED(DestMesh%Viz%Scalar     ) ) DestMesh%Viz%Scalar = SrcMesh%Viz%Scalar
-      IF ( ALLOCATED(SrcMesh%Viz%Profile    ) .AND. ALLOCATED(DestMesh%Viz%Profile    ) ) DestMesh%Viz%Profile = SrcMesh%Viz%Profile
-
       !DestMesh%spatial = SrcMesh%spatial !bjj: unused?
+
+
+      !> copy visualization data
+      DestMesh%Viz%VizType = SrcMesh%Viz%VizType
+      DestMesh%Viz%Name    = SrcMesh%Viz%Name
+      IF ( ALLOCATED(SrcMesh%Viz%Radius       ) .AND. ALLOCATED(DestMesh%Viz%Radius       ) ) DestMesh%Viz%Radius = SrcMesh%Viz%Radius
+      IF ( ALLOCATED(SrcMesh%Viz%Profile      ) .AND. ALLOCATED(DestMesh%Viz%Profile      ) ) DestMesh%Viz%Profile = SrcMesh%Viz%Profile
+      IF ( ALLOCATED(SrcMesh%Viz%Connectivity ) .AND. ALLOCATED(DestMesh%Viz%Connectivity ) ) DestMesh%Viz%Connectivity = SrcMesh%Viz%Connectivity
 
    END SUBROUTINE MeshCopy
 
