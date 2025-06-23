@@ -57,6 +57,12 @@ MODULE ModMesh_Types
        "Quad4  ","Quad8  ","Tet4   ","Tet10  ","Hex8   ",&
        "Hex20  ","Wedge6 ","Wedge15"                   /)   !< element names
 
+   ! Visualization cross section types
+   INTEGER, PUBLIC, PARAMETER :: MESH_VIZTYPE_NONE    = 0   !< No visualization data
+   INTEGER, PUBLIC, PARAMETER :: MESH_VIZTYPE_LINE    = 1   !< Line connectivity only
+   INTEGER, PUBLIC, PARAMETER :: MESH_VIZTYPE_CIRC    = 2   !< Circular visualization shell 
+   INTEGER, PUBLIC, PARAMETER :: MESH_VIZTYPE_PRFL    = 3   !< Arbitrary shell visualization cross-section (defined by Profile)
+
 
    INTEGER, PUBLIC, PARAMETER :: MESH_NEWCOPY         = 1   !< parameter for type of mesh copy: new mesh instance
    INTEGER, PUBLIC, PARAMETER :: MESH_SIBLING         = 2   !< parameter for type of mesh copy: new sibling (shares element and reference data; fields separate)
@@ -98,11 +104,16 @@ MODULE ModMesh_Types
      TYPE(ElemRecType), POINTER :: Element => NULL()        !< pointer to a particular mesh element
    END TYPE ElemListType
 
+
+   !> Mesh vizualization information
+   !! - connectivity information is stored in here so that we can do surface vis for point meshes (i.e. HydroDyn::Morison meshes)
+   !! - Either Radius (MESH_VIZTYPE_CIRC) or Profile (MESH_VIZTYPE_PRFL) should be populated, but not both
    TYPE, PUBLIC :: MeshVizType
       INTEGER(IntKi)          :: VizType                     !< Visualization type identifier
-      REAL(SiKi), allocatable :: Radius(:)                   !< Scaling factor for profile
+      REAL(SiKi), allocatable :: Radius(:)                   !< Radius for circular section
       REAL(SiKi), allocatable :: Profile(:,:,:)              !< XY point coordinates of profile at nodes ([X,Y],Node)
       INTEGER(IntKi), allocatable :: Connectivity(:,:)       !< Node connectivity (list of pairs of connected nodes)
+      CHARACTER(64) :: Name                                  !< Visualization output root name (WrVTK prepends/appends to this)
    END TYPE MeshVizType
 
       !> mesh data structure
