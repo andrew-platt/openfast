@@ -2019,6 +2019,9 @@ SUBROUTINE MeshWrVTK_PointSurface ( RefPoint, M, FileRootName, VTKcount, OutputF
       IF ( ALLOCATED(SrcMesh%Scalars        ) .AND. ALLOCATED(DestMesh%Scalars        ) ) DestMesh%Scalars = SrcMesh%Scalars
 
 
+      IF ( ALLOCATED(SrcMesh%Viz%Scalar     ) .AND. ALLOCATED(DestMesh%Viz%Scalar     ) ) DestMesh%Viz%Scalar = SrcMesh%Viz%Scalar
+      IF ( ALLOCATED(SrcMesh%Viz%Profile    ) .AND. ALLOCATED(DestMesh%Viz%Profile    ) ) DestMesh%Viz%Profile = SrcMesh%Viz%Profile
+
       !DestMesh%spatial = SrcMesh%spatial !bjj: unused?
 
    END SUBROUTINE MeshCopy
