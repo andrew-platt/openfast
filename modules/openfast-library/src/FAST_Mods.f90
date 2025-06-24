@@ -40,19 +40,6 @@ MODULE FAST_ModTypes
    INTEGER(IntKi), PARAMETER :: STATE_SAVED_CURR        = 3
    INTEGER(IntKi), PARAMETER :: STATE_SAVED_PRED        = 4
    
-   ! VTK visualization
-   INTEGER(IntKi), PARAMETER :: VTK_Unknown             = -1         !< unknown option (will produce error)
-   INTEGER(IntKi), PARAMETER :: VTK_None                =  0         !< none (no VTK output)
-   INTEGER(IntKi), PARAMETER :: VTK_InitOnly            =  1         !< VTK output only at initialization
-   INTEGER(IntKi), PARAMETER :: VTK_Animate             =  2         !< VTK animation output
-   INTEGER(IntKi), PARAMETER :: VTK_ModeShapes          =  3         !< VTK output after linearization analysis
-      
-   INTEGER(IntKi), PARAMETER :: VTK_Surf                =  1         !< output surfaces
-   INTEGER(IntKi), PARAMETER :: VTK_Basic               =  2         !< output minimal number of point/line meshes
-   INTEGER(IntKi), PARAMETER :: VTK_All                 =  3         !< output all point/line meshes
-   INTEGER(IntKi), PARAMETER :: VTK_Old                 =  4         !< output in old binary format (for Matlab viewing)
-   REAL(SiKi),     PARAMETER :: VTK_GroundFactor        =  4.0_SiKi  !< factor for number of rotor radii -- sets width of seabed, waves, and still water in VTK surface visualization
-         
    ! linearization values
    INTEGER(IntKi), PARAMETER :: LIN_NONE                = 0          !< no inputs/outputs in linearization
    INTEGER(IntKi), PARAMETER :: LIN_STANDARD            = 1          !< use standard inputs/outputs in linearization
