@@ -11,6 +11,20 @@ module VTK
 
    implicit none
 
+  ! VTK visualization
+   integer(IntKi), parameter :: VTK_Unknown             = -1         !< unknown option (will produce error)
+   integer(IntKi), parameter :: VTK_None                =  0         !< none (no VTK output)
+   integer(IntKi), parameter :: VTK_InitOnly            =  1         !< VTK output only at initialization
+   integer(IntKi), parameter :: VTK_Animate             =  2         !< VTK animation output
+   integer(IntKi), parameter :: VTK_ModeShapes          =  3         !< VTK output after linearization analysis
+      
+   integer(IntKi), parameter :: VTK_Surf                =  1         !< output surfaces
+   integer(IntKi), parameter :: VTK_Basic               =  2         !< output minimal number of point/line meshes
+   integer(IntKi), parameter :: VTK_All                 =  3         !< output all point/line meshes
+   integer(IntKi), parameter :: VTK_Old                 =  4         !< output in old binary format (for Matlab viewing)
+   real(SiKi),     parameter :: VTK_GroundFactor        =  4.0_SiKi  !< factor for number of rotor radii -- sets width of seabed, waves, and still water in VTK surface visualization
+         
+   ! formatting
    character(*), parameter :: RFMT='E17.8E3'
    character(*), parameter :: IFMT='I7'
 
