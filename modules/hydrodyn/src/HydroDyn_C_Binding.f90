@@ -698,17 +698,17 @@ CONTAINS
       ErrMsg3  = ""
       if ( NumNodePts > 1 ) then
          if ( HD%u(1)%Morison%Mesh%Committed .and. HD%u(1)%WAMITMesh%Committed ) then
-            if ( (HD%u(1)%Morison%Mesh%Nnodes + HD%u(1)%WAMITMesh%Nnodes) < 2_IntKi) then
+            if ( NumNodePts > (HD%u(1)%Morison%Mesh%Nnodes + HD%u(1)%WAMITMesh%Nnodes)) then
                ErrStat3 = ErrID_Fatal
                ErrMsg3  = "More than one node passed into library, but only one HydroDyn node exists."
             endif
          elseif ( HD%u(1)%Morison%Mesh%Committed ) then     ! No WAMIT
-            if ( HD%u(1)%Morison%Mesh%Nnodes < 2_IntKi ) then
+            if ( NumNodePts > HD%u(1)%Morison%Mesh%Nnodes ) then
                ErrStat3 = ErrID_Fatal
                ErrMsg3  = "More than one node passed into library, but only one HydroDyn node exists on Morison mesh."
             endif
          elseif ( HD%u(1)%WAMITMesh%Committed    ) then     ! No Morison
-            if ( HD%u(1)%WAMITMesh%Nnodes  < 2_IntKi ) then
+            if ( NumNodePts > HD%u(1)%WAMITMesh%Nnodes ) then
                ErrStat3 = ErrID_Fatal
                ErrMsg3  = "More than one node passed into library, but only one HydroDyn node exists on the WAMIT mesh."
             endif
