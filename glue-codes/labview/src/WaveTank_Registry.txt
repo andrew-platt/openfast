@@ -13,6 +13,15 @@
 include    Registry_NWTC_Library.txt
 #
 
+## numbers for modules don't match what is used in the FAST_Registry.txt - there is no reason to match them.
+param    WaveTank/WT          -             INTEGER            Module_Unknown       - -1  -  "Unknown" -
+param    ^                    -             INTEGER            Module_None          -  0  -  "No module selected" -
+param    ^                    -             INTEGER            Module_ADI           -  1  -  "AeroDyn-Inflow" -
+param    ^                    -             INTEGER            Module_SrvD          -  2  -  "ServoDyn" -
+param    ^                    -             INTEGER            Module_SeaSt         -  3  -  "SeaState" -
+param    ^                    -             INTEGER            Module_MD            -  4  -  "MoorDyn" -
+
+
 typedef  WaveTank/WT          SimType        c_double          DT                   -  -  -  "timestep" -
 typedef  ^                    ^              c_double          TMax                 -  -  -  "Max sim time" -
 typedef  ^                    ^              c_int             MHK                  -  -  -  "MHK turbine type (switch) {0=Not an MHK turbine; 1=Fixed MHK turbine; 2=Floating MHK turbine}" (-)
@@ -21,6 +30,7 @@ typedef  ^                    ^              c_float           ScaleFact        
 typedef  ^                    ^              c_float           DensFact             -  1  -  "ratio of density - Density_full/Density_model (rho_F/rho_M).  Used with Froude scaling of forces/moments" (-)
 typedef  ^                    ^              c_int             DebugLevel           -  -  -  "Debug level for outputs" -
 typedef  ^                    ^              character(1024)   OutRootName          -  -  -  "Rootname for outputs" -
+
 
 typedef  ^                    EnvType        c_float           Gravity              -  -  -  "gravitational constant (positive for down)" (m/s^2)
 typedef  ^                    ^              ^                 WtrDens              -  -  -  "Water density" (kg/m^3)
@@ -75,6 +85,12 @@ typedef  ^                    ^              WaveBuoyType     WaveBuoy          
 typedef  ^                    ^              OutFilesType     Outs                 -  -  -  "Output settings" -
 typedef  ^                    ^              VizType          Viz                  -  -  -  "Vizualization settings" -
 typedef  ^                    ^              ModSettings      ModSettings          -  -  -  "Input files for each module" -
+# Modules in use
+typedef  ^                    ^              IntKi            CompAero             - -1  -  "Compute aerodynamic loads (switch) {0=None; 2=AeroDyn}" -
+typedef  ^                    ^              ^                CompServo            - -1  -  "Compute control and electrical-drive dynamics (switch) {0=None; 1=ServoDyn}" -
+typedef  ^                    ^              ^                CompSeaSt            - -1  -  "Compute sea state information (switch) {0=None; 1=SeaState}" -
+typedef  ^                    ^              ^                CompMooring          - -1  -  "Compute mooring system (switch) {0=None; 3=MoorDyn}" -
+
 
 
 # Storage for IO to CalcStep
