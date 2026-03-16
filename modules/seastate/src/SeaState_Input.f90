@@ -983,8 +983,8 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
       !------------------------- Near-surface current ------------------------
 
       ! CurrNSRef - Near-surface current reference depth.
-      if ( InputFileData%Current%CurrNSRef <= 0.0 ) then
-         call SetErrStat( ErrID_Fatal,'CurrNSRef must be greater than zero.',ErrStat,ErrMsg,RoutineName)
+      if ( InputFileData%Current%CurrNSV0 /= 0.0_SiKi .AND. InputFileData%Current%CurrNSRef <= 0.0_SiKi ) then
+         call SetErrStat( ErrID_Fatal,'CurrNSRef must be greater than zero when CurrNSV0 is nonzero.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
