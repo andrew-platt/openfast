@@ -34,6 +34,12 @@ MODULE WaveTank_Types
 USE ISO_C_BINDING
 USE NWTC_Library
 IMPLICIT NONE
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_Unknown                   = -1      ! Unknown [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_None                      = 0      ! No module selected [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_ADI                       = 1      ! AeroDyn-Inflow [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_SrvD                      = 2      ! ServoDyn [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_SeaSt                     = 3      ! SeaState [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_MD                        = 4      ! MoorDyn [-]
 ! =========  SimType  =======
   TYPE, PUBLIC :: SimType
     REAL(c_double)  :: DT = 0.0_R8Ki      !< timestep [-]
@@ -121,6 +127,10 @@ IMPLICIT NONE
     TYPE(OutFilesType)  :: Outs      !< Output settings [-]
     TYPE(VizType)  :: Viz      !< Vizualization settings [-]
     TYPE(ModSettings)  :: ModSettings      !< Input files for each module [-]
+    INTEGER(IntKi)  :: CompAero = -1      !< Compute aerodynamic loads (switch) {0=None; 2=AeroDyn} [-]
+    INTEGER(IntKi)  :: CompServo = -1      !< Compute control and electrical-drive dynamics (switch) {0=None; 1=ServoDyn} [-]
+    INTEGER(IntKi)  :: CompSeaSt = -1      !< Compute sea state information (switch) {0=None; 1=SeaState} [-]
+    INTEGER(IntKi)  :: CompMooring = -1      !< Compute mooring system (switch) {0=None; 3=MoorDyn} [-]
   END TYPE SimSettingsType
 ! =======================
 ! =========  CalcStepIOdataType  =======
@@ -668,6 +678,10 @@ subroutine WT_CopySimSettingsType(SrcSimSettingsTypeData, DstSimSettingsTypeData
    call WT_CopyModSettings(SrcSimSettingsTypeData%ModSettings, DstSimSettingsTypeData%ModSettings, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   DstSimSettingsTypeData%CompAero = SrcSimSettingsTypeData%CompAero
+   DstSimSettingsTypeData%CompServo = SrcSimSettingsTypeData%CompServo
+   DstSimSettingsTypeData%CompSeaSt = SrcSimSettingsTypeData%CompSeaSt
+   DstSimSettingsTypeData%CompMooring = SrcSimSettingsTypeData%CompMooring
 end subroutine
 
 subroutine WT_DestroySimSettingsType(SimSettingsTypeData, ErrStat, ErrMsg)
@@ -710,6 +724,10 @@ subroutine WT_PackSimSettingsType(RF, Indata)
    call WT_PackOutFilesType(RF, InData%Outs) 
    call WT_PackVizType(RF, InData%Viz) 
    call WT_PackModSettings(RF, InData%ModSettings) 
+   call RegPack(RF, InData%CompAero)
+   call RegPack(RF, InData%CompServo)
+   call RegPack(RF, InData%CompSeaSt)
+   call RegPack(RF, InData%CompMooring)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -726,6 +744,10 @@ subroutine WT_UnPackSimSettingsType(RF, OutData)
    call WT_UnpackOutFilesType(RF, OutData%Outs) ! Outs 
    call WT_UnpackVizType(RF, OutData%Viz) ! Viz 
    call WT_UnpackModSettings(RF, OutData%ModSettings) ! ModSettings 
+   call RegUnpack(RF, OutData%CompAero); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CompServo); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CompSeaSt); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CompMooring); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine WT_CopyCalcStepIOdataType(SrcCalcStepIOdataTypeData, DstCalcStepIOdataTypeData, CtrlCode, ErrStat, ErrMsg)

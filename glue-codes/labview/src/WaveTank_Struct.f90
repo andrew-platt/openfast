@@ -50,6 +50,7 @@ contains
 
 
 !> create the structural model, allocate temp data storage, setup mesh mappings
+!! NOTE: meshes are created and mapped regardless of what modules are actually used
 subroutine StructCreate(SimSettings, MeshMotions, MeshLoads, MeshMaps, StructTmp, ErrStat, ErrMsg)
    type(SimSettingsType),  target,  intent(in   )  :: SimSettings
    type(MeshesMotionType), target,  intent(inout)  :: MeshMotions
@@ -415,44 +416,48 @@ subroutine StructLoadsMeshTransfer(SimSettings, CalcStepIO, MeshMotions, MeshLoa
    !-----------------------------------------
    ! Aero loading
    !-----------------------------------------
-   ! Transfer blade root loads to hub
-   do k=1,TrbCfg%NumBl
-      Root   => MeshMotions%BladeRootMotion(k)
-      RootLd => MeshLoads%BladeRootLoads(k)
-      call Transfer_Point_To_Point( RootLd, HubLd, MeshMaps%Load_BldRoot_2_Hub(k), ErrStat2, ErrMsg2, Root, Hub )
+   if (SimSettings%CompAero == Module_ADI) then
+      ! Transfer blade root loads to hub
+      do k=1,TrbCfg%NumBl
+         Root   => MeshMotions%BladeRootMotion(k)
+         RootLd => MeshLoads%BladeRootLoads(k)
+         call Transfer_Point_To_Point( RootLd, HubLd, MeshMaps%Load_BldRoot_2_Hub(k), ErrStat2, ErrMsg2, Root, Hub )
+         if (Failed()) return
+      enddo
+ 
+      ! Transfer hub to platform
+      call Transfer_Point_To_Point( HubLd, PtfmLd, MeshMaps%Load_Hub_2_PRP, ErrStat2, ErrMsg2, Hub, Ptfm )
       if (Failed()) return
-   enddo
-
-   ! Transfer hub to platform
-   call Transfer_Point_To_Point( HubLd, PtfmLd, MeshMaps%Load_Hub_2_PRP, ErrStat2, ErrMsg2, Hub, Ptfm )
-   if (Failed()) return
-
-
-   !-----------------------------------------
-   ! Transfer tower to platform
-   !  NOTE: no tower loads at present from ADI
-   !FIXME: add tower loads output transfer to mesh here
-   !call Transfer_Line2_To_Point( TwrLd, PtfmLdTmp, MeshMaps%Load_Twr_2_PRP, ErrStat2, ErrMsg2, Twr, Ptfm )
-   !PtfmLd%Force(1:3,1)  = PtfmLd%Force(1:3,1)  + PtfmLdTmp%Force(1:3,1)
-   !PtfmLd%Moment(1:3,1) = PtfmLd%Moment(1:3,1) + PtfmLdTmp%Moment(1:3,1)
-
-   ! Store the ADI summed foreces and moments for output
-   StructTmp%FrcMom_ADI_at_Ptfm(1:3) = PtfmLd%Force(1:3,1)
-   StructTmp%FrcMom_ADI_at_Ptfm(4:6) = PtfmLd%Moment(1:3,1)
+ 
+ 
+      !-----------------------------------------
+      ! Transfer tower to platform
+      !  NOTE: no tower loads at present from ADI
+      !FIXME: add tower loads output transfer to mesh here
+      !call Transfer_Line2_To_Point( TwrLd, PtfmLdTmp, MeshMaps%Load_Twr_2_PRP, ErrStat2, ErrMsg2, Twr, Ptfm )
+      !PtfmLd%Force(1:3,1)  = PtfmLd%Force(1:3,1)  + PtfmLdTmp%Force(1:3,1)
+      !PtfmLd%Moment(1:3,1) = PtfmLd%Moment(1:3,1) + PtfmLdTmp%Moment(1:3,1)
+ 
+      ! Store the ADI summed foreces and moments for output
+      StructTmp%FrcMom_ADI_at_Ptfm(1:3) = PtfmLd%Force(1:3,1)
+      StructTmp%FrcMom_ADI_at_Ptfm(4:6) = PtfmLd%Moment(1:3,1)
+   endif
 
 
    !-----------------------------------------
    ! Mooring loading
    !-----------------------------------------
-   ! Transfer mooring load
-   call Transfer_Point_To_Point( MoorLd, PtfmLdTmp, MeshMaps%Load_Moor_2_PRP, ErrStat2, ErrMsg2, Ptfm, Ptfm )
-   if (Failed()) return
-   PtfmLd%Force(1:3,1)  = PtfmLd%Force(1:3,1)  + PtfmLdTmp%Force(1:3,1)
-   PtfmLd%Moment(1:3,1) = PtfmLd%Moment(1:3,1) + PtfmLdTmp%Moment(1:3,1)
-
-   ! Store the MD summed foreces and moments for output
-   StructTmp%FrcMom_MD_at_Ptfm(1:3) = PtfmLdTmp%Force(1:3,1)
-   StructTmp%FrcMom_MD_at_Ptfm(4:6) = PtfmLdTmp%Moment(1:3,1)
+   if (SimSettings%CompMooring == Module_MD) then
+      ! Transfer mooring load
+      call Transfer_Point_To_Point( MoorLd, PtfmLdTmp, MeshMaps%Load_Moor_2_PRP, ErrStat2, ErrMsg2, Ptfm, Ptfm )
+      if (Failed()) return
+      PtfmLd%Force(1:3,1)  = PtfmLd%Force(1:3,1)  + PtfmLdTmp%Force(1:3,1)
+      PtfmLd%Moment(1:3,1) = PtfmLd%Moment(1:3,1) + PtfmLdTmp%Moment(1:3,1)
+ 
+      ! Store the MD summed foreces and moments for output
+      StructTmp%FrcMom_MD_at_Ptfm(1:3) = PtfmLdTmp%Force(1:3,1)
+      StructTmp%FrcMom_MD_at_Ptfm(4:6) = PtfmLdTmp%Moment(1:3,1)
+   endif
 
 contains
    logical function Failed()

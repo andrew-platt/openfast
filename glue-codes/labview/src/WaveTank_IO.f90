@@ -107,6 +107,11 @@ subroutine ParseInputFile(FileInfo_In, SimSettings, ErrStat, ErrMsg)
 !   call ParseVar( FileInfo_In, CurLine, 'DensFact',         SimSettings%Sim%DensFact,              ErrStat2, ErrMsg2); if(Failed()) return;  ! ratio of density - Density_full/Density_model (rho_F/rho_M).  Used with Froude scaling of forces/moments" (-)
    call ParseVar( FileInfo_In, CurLine, 'DebugLevel',       SimSettings%Sim%DebugLevel,            ErrStat2, ErrMsg2); if(Failed()) return;  ! 0: none, 1: I/O summary, 2: +positions/orientations passed, 3:, 4: +all meshes
    call ParseVar( FileInfo_In, CurLine, 'OutRootName',      SimSettings%Sim%OutRootName,           ErrStat2, ErrMsg2); if(Failed()) return;  ! Root name for any summary or other files
+   ! -------- Feature switches -----------
+   call ParseVar( FileInfo_In, CurLine, 'CompAero',         SimSettings%CompAero,                  ErrStat2, ErrMsg2); if(Failed()) return;  ! Compute aerodynamic loads (switch) {0=None; 2=AeroDyn}
+   call ParseVar( FileInfo_In, CurLine, 'CompServo',        SimSettings%CompServo,                 ErrStat2, ErrMsg2); if(Failed()) return;  ! Compute control and electrical-drive dynamics (switch) {0=None; 1=ServoDyn}
+   call ParseVar( FileInfo_In, CurLine, 'CompSeaSt',        SimSettings%CompSeaSt,                 ErrStat2, ErrMsg2); if(Failed()) return;  ! Compute sea state information (switch) {0=None; 1=SeaState}
+   call ParseVar( FileInfo_In, CurLine, 'CompMooring',      SimSettings%CompMooring,               ErrStat2, ErrMsg2); if(Failed()) return;  ! Compute mooring system (switch) {0=None; 3=MoorDyn}
    ! -------- Environment ----------------
    call ParseVar( FileInfo_In, CurLine, 'Gravity',          SimSettings%Env%Gravity,               ErrStat2, ErrMsg2); if(Failed()) return;  ! Gravitational acceleration (m/s^2)
    call ParseVar( FileInfo_In, CurLine, 'WtrDens',          SimSettings%Env%WtrDens,               ErrStat2, ErrMsg2); if(Failed()) return;  ! Water density (kg/m^3)
@@ -116,14 +121,16 @@ subroutine ParseInputFile(FileInfo_In, SimSettings, ErrStat, ErrMsg)
    call ParseVar( FileInfo_In, CurLine, 'Pvap',             SimSettings%Env%Pvap,                  ErrStat2, ErrMsg2); if(Failed()) return;  !  Vapour pressure of working fluid (Pa) [used only for an MHK turbine cavitation check]
    call ParseVar( FileInfo_In, CurLine, 'WtrDpth',          SimSettings%Env%WtrDpth,               ErrStat2, ErrMsg2); if(Failed()) return;  ! Water depth (m)
    call ParseVar( FileInfo_In, CurLine, 'MSL2SWL',          SimSettings%Env%MSL2SWL,               ErrStat2, ErrMsg2); if(Failed()) return;  ! Offset between still-water level and mean sea level (m) [positive upward]
+   ! -------- AeroDyn + InflowWind -------
+   call ParseVar( FileInfo_In, CurLine, 'AD_InputFile',     SimSettings%ModSettings%AD_InputFile,  ErrStat2, ErrMsg2); if(Failed()) return;  ! AeroDyn input file
+   call ParseVar( FileInfo_In, CurLine, 'IfW_InputFile',    SimSettings%ModSettings%IfW_InputFile, ErrStat2, ErrMsg2); if(Failed()) return;  ! InflowWind input file
+   ! -------- ServoDyn -------------------
+!   call ParseVar( FileInfo_In, CurLine, 'SrvD_InputFile',   SimSettings%ModSettings%SrvD_InputFile,ErrStat2, ErrMsg2); if(Failed()) return;  ! ServoDyn input file
    ! -------- SeaState -------------------
    call ParseVar( FileInfo_In, CurLine, 'SS_InputFile',     SimSettings%ModSettings%SS_InputFile,  ErrStat2, ErrMsg2); if(Failed()) return;  ! SeaState input file
    call ParseVar( FileInfo_In, CurLine, 'WaveTimeShift',    SimSettings%ModSettings%WaveTimeShift, ErrStat2, ErrMsg2); if(Failed()) return;  ! Shift the SeaState wavetime by this amount (for phase shifting waves to match tank)
    ! -------- MoorDyn --------------------
    call ParseVar( FileInfo_In, CurLine, 'MD_InputFile',     SimSettings%ModSettings%MD_InputFile,  ErrStat2, ErrMsg2); if(Failed()) return;  ! MoorDyn input file
-   ! -------- AeroDyn + InflowWind -------
-   call ParseVar( FileInfo_In, CurLine, 'AD_InputFile',     SimSettings%ModSettings%AD_InputFile,  ErrStat2, ErrMsg2); if(Failed()) return;  ! AeroDyn input file
-   call ParseVar( FileInfo_In, CurLine, 'IfW_InputFile',    SimSettings%ModSettings%IfW_InputFile, ErrStat2, ErrMsg2); if(Failed()) return;  ! InflowWind input file
    ! -------- Turbine Configuration ------
    call ParseVar( FileInfo_In, CurLine, 'NumBl',            SimSettings%TrbCfg%NumBl,              ErrStat2, ErrMsg2); if(Failed()) return;  ! Number of blades (-)
    call ParseVar( FileInfo_In, CurLine, 'HubRad',           SimSettings%TrbCfg%HubRad,             ErrStat2, ErrMsg2); if(Failed()) return;  ! The distance from the rotor apex to the blade root (meters)
@@ -209,6 +216,46 @@ subroutine ValidateInputFile(SimSettings, ErrStat, ErrMsg)
       call WrScr("|                                                         |")
       call WrScr("\---------------------------------------------------------/")
    endif
+
+
+   !------------------------
+   ! Feature switches
+   !------------------------
+   select case (SimSettings%CompAero)
+   case (0_IntKi) ! off
+      SimSettings%CompAero = Module_None
+   case (2_IntKi) ! AeroDyn
+      SimSettings%CompAero = Module_ADI
+   case default
+      call SetErrStat(ErrID_Fatal,"CompAero must be 0: none, or 2=AeroDyn-Inflow instead of "//trim(Num2LStr(SimSettings%CompAero)),ErrStat,ErrMsg,RoutineName)
+   end select
+
+   select case (SimSettings%CompServo)
+   case (0_IntKi) ! off
+      SimSettings%CompServo = Module_None
+   case (1_IntKi) ! ServoDyn
+      SimSettings%CompServo = Module_SrvD
+   case default
+      call SetErrStat(ErrID_Fatal,"CompServo must be 0: none, or 1=ServoDyn instead of "//trim(Num2LStr(SimSettings%CompServo)),ErrStat,ErrMsg,RoutineName)
+   end select
+
+   select case (SimSettings%CompSeaSt)
+   case (0_IntKi) ! off
+      SimSettings%CompSeaSt = Module_None
+   case (1_IntKi) ! SeaStDyn
+      SimSettings%CompSeaSt = Module_SeaSt
+   case default
+      call SetErrStat(ErrID_Fatal,"CompSeaSt must be 0: none, or 1=SeaState instead of "//trim(Num2LStr(SimSettings%CompSeaSt)),ErrStat,ErrMsg,RoutineName)
+   end select
+
+   select case (SimSettings%CompMooring)
+   case (0_IntKi) ! off
+      SimSettings%CompMooring = Module_None
+   case (3_IntKi) ! MooringDyn
+      SimSettings%CompMooring = Module_MD
+   case default
+      call SetErrStat(ErrID_Fatal,"CompMooring must be 0: none, or 3=MoorDyn instead of "//trim(Num2LStr(SimSettings%CompMooring)),ErrStat,ErrMsg,RoutineName)
+   end select
 
 
    !------------------------
@@ -306,6 +353,14 @@ subroutine  InitOutputFile(WrOutputData, ErrStat, ErrMsg)
    do i=2,NumDefChans
       call WrFileNR(WrOutputData%OutUn, tab//DefChanNames(i))
    enddo
+   ! ADI
+   do i=1,WrOutputData%NumChans_ADI
+      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputHdr_ADI(i))
+   enddo
+   ! SrvD
+!   do i=1,WrOutputData%NumChans_SrvD
+!      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputHdr_SrvD(i))
+!   enddo
    ! SS
    do i=1,WrOutputData%NumChans_SS
       call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputHdr_SS(i))
@@ -313,10 +368,6 @@ subroutine  InitOutputFile(WrOutputData, ErrStat, ErrMsg)
    ! MD
    do i=1,WrOutputData%NumChans_MD
       call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputHdr_MD(i))
-   enddo
-   ! ADI
-   do i=1,WrOutputData%NumChans_ADI
-      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputHdr_ADI(i))
    enddo
    write (WrOutputData%OutUn,'()')
 
@@ -328,6 +379,14 @@ subroutine  InitOutputFile(WrOutputData, ErrStat, ErrMsg)
    do i=2,NumDefChans
       call WrFileNR(WrOutputData%OutUn, tab//DefChanUnits(i))
    enddo
+   ! ADI
+   do i=1,WrOutputData%NumChans_ADI
+      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputUnt_ADI(i))
+   enddo
+   ! SrvD
+!   do i=1,WrOutputData%NumChans_SrvD
+!      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputUnt_SrvD(i))
+!   enddo
    ! SS
    do i=1,WrOutputData%NumChans_SS
       call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputUnt_SS(i))
@@ -336,17 +395,13 @@ subroutine  InitOutputFile(WrOutputData, ErrStat, ErrMsg)
    do i=1,WrOutputData%NumChans_MD
       call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputUnt_MD(i))
    enddo
-   ! ADI
-   do i=1,WrOutputData%NumChans_ADI
-      call WrFileNR(WrOutputData%OutUn, tab//WrOutputData%WriteOutputUnt_ADI(i))
-   enddo
    write (WrOutputData%OutUn,'()')
 
 end subroutine
 
 
-subroutine WriteOutputLine(OutFmt, CalcStepIO, StructTmp, WrOutputData, ErrStat, ErrMsg)
-   character(*),              intent(in   )  :: OutFmt
+subroutine WriteOutputLine(SimSettings, CalcStepIO, StructTmp, WrOutputData, ErrStat, ErrMsg)
+   type(SimSettingsType),     intent(inout)  :: SimSettings
    type(CalcStepIOdataType),  intent(in   )  :: CalcStepIO
    type(StructTmpType),       intent(in   )  :: StructTmp            ! operating states are in here
    type(WrOutputDataType),    intent(in   )  :: WrOutputData
@@ -362,7 +417,7 @@ subroutine WriteOutputLine(OutFmt, CalcStepIO, StructTmp, WrOutputData, ErrStat,
    ErrStat = ErrID_None
    ErrMSg  = ""
 
-   frmt = '"'//tab//'"'//trim(OutFmt)      ! format for array elements from individual modules
+   frmt = '"'//tab//'"'//trim(SimSettings%Outs%OutFmt)      ! format for array elements from individual modules
    OutUnit = WrOutputData%OutUn
    if (OutUnit <= 0_IntKi) then
       ErrStat = ErrID_Severe
@@ -383,9 +438,18 @@ subroutine WriteOutputLine(OutFmt, CalcStepIO, StructTmp, WrOutputData, ErrStat,
    TmpAry5 = (/ R2D*StructTmp%Azimuth, StructTmp%RotSpeed, R2D*StructTmp%BldPitch, R2D*StructTmp%NacYaw, CalcStepIO%BuoyWaveElev /)
    call WrNumAryFileNR(OutUnit, TmpAry5,                      frmt, errStat2, errMsg2); if (Failed()) return
    ! channels from modules
-   call WrNumAryFileNR(OutUnit, WrOutputData%OutData_SS,      frmt, errStat2, ErrMsg2); if (Failed()) return
-   call WrNumAryFileNR(OutUnit, WrOutputData%OutData_MD,      frmt, errStat2, ErrMsg2); if (Failed()) return
-   call WrNumAryFileNR(OutUnit, WrOutputData%OutData_ADI,     frmt, errStat2, ErrMsg2); if (Failed()) return
+   if (SimSettings%CompAero == Module_ADI) then
+      call WrNumAryFileNR(OutUnit, WrOutputData%OutData_ADI,     frmt, errStat2, ErrMsg2); if (Failed()) return
+   endif
+!   if (SimSettings%CompServo == Module_SrvD) then
+!      call WrNumAryFileNR(OutUnit, WrOutputData%OutData_SrvD,     frmt, errStat2, ErrMsg2); if (Failed()) return
+!   endif
+   if (SimSettings%CompSeaSt == Module_SeaSt) then
+      call WrNumAryFileNR(OutUnit, WrOutputData%OutData_SS,      frmt, errStat2, ErrMsg2); if (Failed()) return
+   endif
+   if (SimSettings%CompMooring == Module_MD) then
+      call WrNumAryFileNR(OutUnit, WrOutputData%OutData_MD,      frmt, errStat2, ErrMsg2); if (Failed()) return
+   endif
    ! write a new line (advance to the next line)
    write (OutUnit,'()')
 contains
