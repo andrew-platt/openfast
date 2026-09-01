@@ -780,7 +780,9 @@ subroutine AWAE_IO_InitGridInfo(InitInp, p, InitOut, errStat, errMsg)
          ! has a single DT_High for the whole farm, so a sub-volume on a different set of times
          ! would silently supply the wrong instant to its turbine. Keep sub-volume 1's table and
          ! verify the rest match it element by element -- comparing only the stride, as was done
-         ! previously, accepts a sequence uniformly offset from the others.
+         ! previously, accepts a sequence uniformly offset from the others. (When the reader
+         ! fast-verifies a sub-volume by directory name it returns sub-volume 1's table, making
+         ! this compare a formality; it is meaningful whenever a full header scan ran.)
          if (nt == 1) then
             call move_alloc(DirIndexTmp, p%DirIndexHigh)
          else
