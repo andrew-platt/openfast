@@ -2978,7 +2978,6 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    integer(intKi)                                 :: n, n_high
    character(3)                                   :: PlaneNumStr ! 2 digit number of the output plane
    CHARACTER(1024)                                :: FileName
-   INTEGER(IntKi)                                 :: Un          ! unit number of opened file
    logical                                        :: WriteWindVTK
 #ifdef FF_TIMING_PRINTS
    real(DbKi)                                     :: tmSer0, tmPar0
@@ -3062,11 +3061,10 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
 
          ! Create the output vtk file with naming <WindFilePath>/Low/DisXY<k>.t<n/p%WrDisSkp1>.vtk
          FileName = trim(p%OutFileFFvtkRoot)//".Low.DisXY"//PlaneNumStr//"."//trim(Tstr)//".vtk"
-         call WrVTK_SP_header(FileName, "Low resolution, disturbed wind of XY Slice at time = "//trim(num2lstr(t))//" seconds.", Un, ErrStat2, ErrMsg2 );   if (Failed()) return;
-         call WrVTK_SP_vectors3D(Un, "Velocity", &
-                                 [p%LowRes%nXYZ(1), p%LowRes%nXYZ(2), 1_IntKi], &
-                                 [p%LowRes%oXYZ(1), p%LowRes%oXYZ(2), p%OutDisWindZ(k)], &
-                                 p%LowRes%dXYZ, m%outVizXYPlane, ErrStat2, ErrMsg2)
+         call WrDisVTK_SP(FileName, "Low resolution, disturbed wind of XY Slice at time = "//trim(num2lstr(t))//" seconds.", &
+                          [p%LowRes%nXYZ(1), p%LowRes%nXYZ(2), 1_IntKi], &
+                          [p%LowRes%oXYZ(1), p%LowRes%oXYZ(2), p%OutDisWindZ(k)], &
+                          p%LowRes%dXYZ, m%outVizXYPlane, ErrStat2, ErrMsg2)
          if (Failed()) return
       end do
 
@@ -3079,11 +3077,10 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
 
          ! Create the output vtk file with naming <WindFilePath>/Low/DisYZ<k>.t<n/p%WrDisSkp1>.vtk
          FileName = trim(p%OutFileFFvtkRoot)//".Low.DisYZ"//PlaneNumStr//"."//trim(Tstr)//".vtk"
-         call WrVTK_SP_header(FileName, "Low resolution, disturbed wind of YZ Slice at time = "//trim(num2lstr(t))//" seconds.", Un, ErrStat2, ErrMsg2 );   if (Failed()) return;
-         call WrVTK_SP_vectors3D(Un, "Velocity", &
-                                 [1, p%LowRes%nXYZ(2), p%LowRes%nXYZ(3)], &
-                                 [p%OutDisWindX(k),p%LowRes%oXYZ(2),p%LowRes%oXYZ(3)], &
-                                 p%LowRes%dXYZ, m%outVizYZPlane, ErrStat2, ErrMsg2)
+         call WrDisVTK_SP(FileName, "Low resolution, disturbed wind of YZ Slice at time = "//trim(num2lstr(t))//" seconds.", &
+                          [1, p%LowRes%nXYZ(2), p%LowRes%nXYZ(3)], &
+                          [p%OutDisWindX(k),p%LowRes%oXYZ(2),p%LowRes%oXYZ(3)], &
+                          p%LowRes%dXYZ, m%outVizYZPlane, ErrStat2, ErrMsg2)
          if (Failed()) return
       end do
 
@@ -3096,11 +3093,10 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
 
          ! Create the output vtk file with naming <WindFilePath>/Low/DisXZ<k>.t<n/p%WrDisSkp1>.vtk
          FileName = trim(p%OutFileFFvtkRoot)//".Low.DisXZ"//PlaneNumStr//"."//trim(Tstr)//".vtk"
-         call WrVTK_SP_header(FileName, "Low resolution, disturbed wind of XZ Slice at time = "//trim(num2lstr(t))//" seconds.", Un, ErrStat2, ErrMsg2);   if (Failed()) return;
-         call WrVTK_SP_vectors3D(Un, "Velocity", &
-                                 [p%LowRes%nXYZ(1), 1, p%LowRes%nXYZ(3)], &
-                                 [p%LowRes%oXYZ(1), p%OutDisWindY(k), p%LowRes%oXYZ(3)], &
-                                 p%LowRes%dXYZ, m%outVizXZPlane, ErrStat2, ErrMsg2)
+         call WrDisVTK_SP(FileName, "Low resolution, disturbed wind of XZ Slice at time = "//trim(num2lstr(t))//" seconds.", &
+                          [p%LowRes%nXYZ(1), 1, p%LowRes%nXYZ(3)], &
+                          [p%LowRes%oXYZ(1), p%OutDisWindY(k), p%LowRes%oXYZ(3)], &
+                          p%LowRes%dXYZ, m%outVizXZPlane, ErrStat2, ErrMsg2)
          if (Failed()) return
       end do
 
@@ -3126,14 +3122,28 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
 
    ! Feature 2: axis-aligned planar sampling (extent-controlled, own sampling rate)
    if ( p%NumPlaneSlices > 0 .and. mod(n, p%WrPlaneSkp) == 0 ) then
+#ifdef FF_TIMING_PRINTS
+      call cpu_time(tmSer0)
+      tmPar0 = AWAE_WallTime()
+#endif
       call EmitPlaneSlices( t, n, p, m, ErrStat2, ErrMsg2 )
       if (Failed()) return
+#ifdef FF_TIMING_PRINTS
+      call AWAE_AddStageTiming('WritePlaneSlices', tmSer0, tmPar0)
+#endif
    end if
 
    ! Feature 3: terrain-following point-cloud sampling (own sampling rate)
    if ( p%NumTerrainSlices > 0 .and. mod(n, p%WrTerrainSkp) == 0 ) then
+#ifdef FF_TIMING_PRINTS
+      call cpu_time(tmSer0)
+      tmPar0 = AWAE_WallTime()
+#endif
       call EmitTerrainSlices( t, n, p, m, ErrStat2, ErrMsg2 )
       if (Failed()) return
+#ifdef FF_TIMING_PRINTS
+      call AWAE_AddStageTiming('WriteTerrainSlices', tmSer0, tmPar0)
+#endif
    end if
 
 contains
