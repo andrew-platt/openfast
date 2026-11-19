@@ -1,4 +1,4 @@
-name: 'EXPERIMENT: 5MW_Land_BD_Linear flakiness'
+name: 'EXPERIMENT: linearization test noise'
 
 # Throwaway experiment. Builds OpenFAST as the dev pipeline does, then runs the
 # single case 5MW_Land_BD_Linear repeatedly on many runners, recording the CPU,
@@ -101,39 +101,17 @@ jobs:
           grep -m1 flags /proc/cpuinfo
           chmod +x exes/*/openfast
           sha256sum exes/*/openfast
-      - name: Run case repeatedly
+      - name: Run all linear cases
         run: |
           set +e
           mkdir -p results
           gcc -O2 -fPIC -shared -ffp-contract=off -o matmul_shim.so ci-exp/matmul_shim.c
-          chmod +x ci-exp/of_wrap.sh
-          REF=/usr/lib/x86_64-linux-gnu/blas:/usr/lib/x86_64-linux-gnu/lapack
-          for exedir in exes/exe-*; do
-            exe=$(basename $exedir)
-            export OF_REAL=$PWD/$exedir/openfast
-            for mode in default shim; do
-              unset LD_PRELOAD
-              case $mode in
-                shim) export OF_PRELOAD=$PWD/matmul_shim.so ;;
-                *)    export OF_PRELOAD= ;;
-              esac
-              echo "LDD $exe $mode: $(ldd $exedir/openfast | grep -E 'blas|lapack|atlas' | awk '{print $1"=>"$3}' | tr '\n' ' ')"
-              for i in 1 2; do
-                bd=$PWD/work/$exe-$mode
-                rm -rf $bd/5MW_Land_BD_Linear
-                python reg_tests/executeOpenfastLinearRegressionCase.py 5MW_Land_BD_Linear \
-                   $PWD/ci-exp/of_wrap.sh $PWD $bd 2 1.9 > run.log 2>&1
-                rc=$?
-                label="rep=${{matrix.rep}} exe=$exe mode=$mode i=$i rc=$rc"
-                env -u LD_LIBRARY_PATH -u GLIBC_TUNABLES python ci-exp/summarize.py $bd/5MW_Land_BD_Linear "$label"
-                out=results/$exe-$mode-$i
-                mkdir -p $out
-                cp run.log $out/
-                cp $bd/5MW_Land_BD_Linear/*.lin $bd/5MW_Land_BD_Linear/5MW_Land_BD_Linear.outb \
-                   $bd/5MW_Land_BD_Linear/5MW_Land_BD_Linear.log $out/ 2>/dev/null
-              done
-            done
-          done
+          chmod +x ci-exp/of_wrap.sh ci-exp/run_all.sh
+          export OF_REAL=$PWD/exes/exe-atlas-1/openfast
+          export OF_PRELOAD=
+          ci-exp/run_all.sh default ${{matrix.rep}}
+          export OF_PRELOAD=$PWD/matmul_shim.so
+          ci-exp/run_all.sh shim ${{matrix.rep}}
           lscpu > results/lscpu.txt
           exit 0
       - name: Upload results
