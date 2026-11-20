@@ -1,0 +1,173 @@
+name: 'EXPERIMENT: regression test cost profile'
+# Throwaway branch. Measures per-test serial cost + peak RSS of every test the
+# rtest-* jobs of automated-dev-tests.yml run, and the slowdown of the offshore
+# set under -j2 / -j4. Not for merging.
+
+on:
+  push:
+    branches: [tmp/regtest-profile]
+
+env:
+  FORTRAN_COMPILER: gfortran-14
+  CXX_COMPILER: g++-14
+  C_COMPILER: gcc-14
+  CMAKE_BUILD_PARALLEL_LEVEL: 8
+  OMP_NUM_THREADS: 1
+  NSHARDS: 6
+
+jobs:
+  build-all-release:   # identical to automated-dev-tests.yml
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libatlas-base-dev libhdf5-dev libnetcdf-dev libopenmpi-dev libyaml-cpp-dev
+      - name: Configure build
+        run: |
+          cmake -E make_directory ${{github.workspace}}/build
+          cd ${{github.workspace}}/build
+          cmake \
+            -DCMAKE_INSTALL_PREFIX:PATH=${{github.workspace}}/install \
+            -DCMAKE_Fortran_COMPILER:STRING=${{env.FORTRAN_COMPILER}} \
+            -DCMAKE_CXX_COMPILER:STRING=${{env.CXX_COMPILER}} \
+            -DCMAKE_C_COMPILER:STRING=${{env.C_COMPILER}} \
+            -DPython_ROOT_DIR:PATH=${{env.pythonLocation}} \
+            -DBUILD_SHARED_LIBS:BOOL=OFF \
+            -DBLA_VENDOR:STRING=ATLAS \
+            -DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo \
+            -DVARIABLE_TRACKING:BOOL=OFF \
+            -DBUILD_TESTING:BOOL=ON \
+            -DCTEST_PLOT_ERRORS:BOOL=ON \
+            -DOPENMP:BOOL=ON \
+            -DDOUBLE_PRECISION=ON \
+            -DBUILD_OPENFAST_CPP_API:BOOL=ON \
+            -DBUILD_OPENFAST_LIB_DRIVER:BOOL=ON \
+            -DBUILD_OPENFAST_CPP_DRIVER:BOOL=ON \
+            -DBUILD_FASTFARM:BOOL=ON \
+            -DAMREX_READER=ON \
+            ${GITHUB_WORKSPACE}
+      - name: Build all
+        working-directory: ${{github.workspace}}/build
+        run: cmake --build . --target all
+      - name: Archive files
+        run: |
+          tar -cf workspace.tar -C ${{github.workspace}} \
+          --exclude='*.a' --exclude='*.o' --exclude='build/ftnmods' \
+          --exclude='docs' --exclude='vs-build' .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-all-release
+          path: workspace.tar
+          retention-days: 3
+
+  serial-profile:
+    runs-on: ubuntu-24.04
+    needs: build-all-release
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-all-release
+      - run: tar -xf workspace.tar -C ${{github.workspace}} && rm workspace.tar
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install glue-codes/python/.
+          pip install -e openfast_io
+          sudo apt-get update -y
+          sudo apt-get install -y libatlas-base-dev libhdf5-dev libnetcdf-dev libopenmpi-dev libyaml-cpp-dev time
+      - name: Runner info
+        run: lscpu | grep -E "Model name|^CPU\(s\)|L3"; free -m; nproc
+      - name: Configure Tests
+        working-directory: ${{github.workspace}}/build
+        run: |
+          cmake -DPython_ROOT_DIR:PATH=${{env.pythonLocation}} -DBUILD_TESTING:BOOL=ON -DCTEST_PLOT_ERRORS:BOOL=ON ${GITHUB_WORKSPACE}
+          cmake --build . --target regression_test_controllers
+      - name: Serial profile
+        working-directory: ${{github.workspace}}/build
+        run: |
+          bash ../ci-exp/enumerate.sh > tests.tsv
+          wc -l tests.tsv
+          python ../ci-exp/profile_serial.py tests.tsv ../ci-exp/prior_costs.csv ${{matrix.shard}} $NSHARDS serial_${{matrix.shard}}.csv
+          lscpu | grep "Model name" > cpu_${{matrix.shard}}.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: serial-${{matrix.shard}}
+          path: |
+            ${{github.workspace}}/build/serial_${{matrix.shard}}.csv
+            ${{github.workspace}}/build/cpu_${{matrix.shard}}.txt
+            ${{github.workspace}}/build/tests.tsv
+
+  offshore-contention:
+    runs-on: ubuntu-24.04
+    needs: build-all-release
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [j2-default, j4-default, j4-lpt]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-all-release
+      - run: tar -xf workspace.tar -C ${{github.workspace}} && rm workspace.tar
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install glue-codes/python/.
+          sudo apt-get update -y
+          sudo apt-get install -y libatlas-base-dev libhdf5-dev libnetcdf-dev libopenmpi-dev libyaml-cpp-dev
+      - name: Runner info
+        run: lscpu | grep -E "Model name|^CPU\(s\)|L3"; free -m; nproc
+      - name: Configure Tests
+        working-directory: ${{github.workspace}}/build
+        run: |
+          cmake -DPython_ROOT_DIR:PATH=${{env.pythonLocation}} -DBUILD_TESTING:BOOL=ON -DCTEST_PLOT_ERRORS:BOOL=ON ${GITHUB_WORKSPACE}
+          cmake --build . --target regression_test_controllers
+      - name: Seed CTest cost data (LPT ordering)
+        if: matrix.variant == 'j4-lpt'
+        working-directory: ${{github.workspace}}/build
+        run: |
+          mkdir -p Testing/Temporary
+          python -c "
+          import csv
+          with open('Testing/Temporary/CTestCostData.txt','w') as f:
+              for r in csv.DictReader(open('../ci-exp/prior_costs.csv')): f.write(f\"{r['test']} 1 {r['median_sec']}\n\")
+              f.write('---\n')
+          "
+          head -3 Testing/Temporary/CTestCostData.txt
+      - name: Run offshore set
+        working-directory: ${{github.workspace}}/build
+        run: |
+          J=$(echo ${{matrix.variant}} | sed 's/^j\([0-9]*\).*/\1/')
+          bash ../ci-exp/memsample.sh mem.log &
+          MS=$!
+          ctest -j$J -L openfast -L offshore -LE "cpp|linear|python|fastlib|multirotor" | tee ctest.log
+          kill $MS || true
+          echo "peak used MB / min avail MB / peak swap MB:"
+          awk 'BEGIN{u=0;a=1e9;s=0} {if($2>u)u=$2; if($3<a)a=$3; if($4>s)s=$4} END{print u, a, s}' mem.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contention-${{matrix.variant}}
+          path: |
+            ${{github.workspace}}/build/mem.log
+            ${{github.workspace}}/build/ctest.log
